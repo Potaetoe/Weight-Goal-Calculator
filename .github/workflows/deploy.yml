@@ -1,0 +1,109 @@
+name: Verify and deploy
+
+# Publishes web/ to GitHub Pages, but only after the Python suite passes
+# and the generated fixture is confirmed current. A stale fixture would
+# let the deployed self-test report PASS while the two implementations
+# actually disagree, which is the one failure this pipeline exists to
+# prevent.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let an in-flight deploy finish rather than cancelling it midway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # tests/test_equivalence.py replays the pre-refactor implementation
+          # from commit 38817ce. With the default shallow clone that commit
+          # is unreachable and the test SKIPS instead of running, so the
+          # suite would go green without ever checking the refactor.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install tkinter
+        # weight_calculator.py imports tkinter at module scope. Importing it
+        # headless is fine - only instantiating Tk() needs a display - but
+        # without the package tests/test_formatting.py silently skips and
+        # the fixture loses its formatted-output section.
+        run: sudo apt-get update && sudo apt-get install -y python3-tk
+
+      - name: Confirm tkinter is importable
+        run: python -c "import tkinter; print('tkinter', tkinter.TkVersion)"
+
+      - name: Run the Python suite
+        run: python -m unittest discover -s tests -t . -v
+
+      - name: Check web/fixture.js is current
+        run: |
+          cp web/fixture.js /tmp/fixture.committed.js
+          python tools/gen_web_fixture.py
+          python - <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          def load(path):
+              text = pathlib.Path(path).read_text(encoding="utf-8")
+              body = text.split("window.WEB_FIXTURE = ", 1)[1].rsplit(";", 1)[0]
+              return json.loads(body)
+
+          # Compared as re-serialized text rather than with ==, because the
+          # fixture contains NaN and NaN != NaN would fail every run.
+          committed = json.dumps(load("/tmp/fixture.committed.js"), sort_keys=True)
+          regenerated = json.dumps(load("web/fixture.js"), sort_keys=True)
+
+          if committed != regenerated:
+              print("::error file=web/fixture.js::web/fixture.js is out of date. "
+                    "calc_core.py changed without the fixture being regenerated, "
+                    "so the deployed self-test would be checking web/calc_core.js "
+                    "against stale expectations. Run: python tools/gen_web_fixture.py "
+                    "and commit the result.")
+              sys.exit(1)
+
+          print("fixture matches the current calc_core.py")
+          PY
+
+      - name: Check the page's assets exist
+        # Cheap guard against a rename breaking the deployed page: the
+        # browser would just 404 the script and render a dead form.
+        run: |
+          test -f web/index.html
+          test -f web/calc_core.js
+          test -f web/selftest.html
+          grep -q 'src="calc_core.js"' web/index.html
+          echo "web/ looks deployable"
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

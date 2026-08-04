@@ -104,6 +104,28 @@ so the app and the self-test run *the same code*. Inlining it would mean
 two copies, and a copy that quietly drifts is exactly what the self-test
 exists to catch.
 
+### Deploying
+
+`.github/workflows/deploy.yml` publishes `web/` to GitHub Pages on every
+push to `main`. A visitor downloads about 39 KB — `index.html` plus
+`calc_core.js`. The 1.5 MB `fixture.js` is only fetched by someone who
+opens the self-test.
+
+**One-time setup:** in the repository's *Settings → Pages*, set **Source**
+to **GitHub Actions**. Until that's done the deploy step fails with a
+"Pages is not enabled" error while the verification step still passes.
+
+The workflow refuses to deploy unless the Python suite passes *and*
+`web/fixture.js` matches what `calc_core.py` currently produces. That
+second check is the point of the pipeline: a stale fixture would leave
+the published self-test comparing `calc_core.js` against outdated
+expectations, so it could show a confident green PASS while the two
+implementations had actually drifted apart.
+
+It also clones with full history, because `tests/test_equivalence.py`
+skips rather than fails when the commit it replays isn't reachable — a
+shallow clone would turn that test into a silent no-op.
+
 ### Differences from the desktop app
 
 Behaviour is identical — same numbers, same refusals. Presentation
