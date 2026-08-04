@@ -92,8 +92,17 @@
   button.install:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   #install-how { margin: 14px 0 0; font-size: .88rem; text-align: left; }
   .steps { margin: 22px 0 0; text-align: left; }
+  .steps summary {
+    cursor: pointer; font-weight: 700; font-size: .9rem;
+    padding: 2px 0;
+  }
+  .steps summary:hover { color: var(--primary-dark); }
+  .steps summary:focus-visible {
+    outline: 3px solid var(--focus); outline-offset: 2px;
+  }
   .steps label {
-    display: block; font-weight: 700; font-size: .9rem; margin-bottom: 7px;
+    display: block; font-size: .8rem; color: var(--muted);
+    margin: 12px 0 6px;
   }
   .steps select {
     font: inherit; font-size: .95rem; width: 100%;
@@ -121,11 +130,12 @@
     </p>
     <button type="button" class="install" id="install-btn">Install this app</button>
     <p id="install-how" hidden></p>
-    <div class="steps">
-      <label for="platform">Step-by-step instructions</label>
+    <details class="steps">
+      <summary>Step-by-step instructions</summary>
+      <label for="platform">Your browser</label>
       <select id="platform"></select>
       <ol id="platform-steps"></ol>
-    </div>
+    </details>
     <p class="alt">
       Prefer not to install? <a href="index.html">Use it in your browser</a> —
       it's the same calculator.

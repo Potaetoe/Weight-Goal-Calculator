@@ -4,6 +4,17 @@ Notable changes to the Weight Goal Calculator, newest first. Dates are
 commit dates. The web version deploys to GitHub Pages on every push to
 `main`, so entries there go live immediately.
 
+## 2026-08-04 — Quieter pages: collapsed instructions, no empty results card
+
+### Changed
+- The install page's step-by-step instructions are now collapsed
+  behind a native disclosure (`<details>`); the platform dropdown and
+  steps appear only after clicking "Step-by-step instructions".
+- The calculator's results card no longer sits empty on the page —
+  it appears the first time Calculate is clicked (for a plan, a
+  calorie-floor refusal, or the fix-the-field hint) and stays from
+  then on.
+
 ## 2026-08-04 — Page redesign: themes, footer navigation, warning moved
 
 ### Added

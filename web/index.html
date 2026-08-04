@@ -299,8 +299,8 @@
 
   <button type="button" class="calc" id="calculate">Calculate</button>
 
-  <div class="card">
-    <p id="results" class="placeholder" role="status" aria-live="polite">Your results will appear here.</p>
+  <div class="card" id="results-card" hidden>
+    <p id="results" class="placeholder" role="status" aria-live="polite"></p>
   </div>
 
   <div class="disclaimer" role="note">
@@ -531,6 +531,10 @@
   }
 
   function showResults(text, cls) {
+    // The card only exists once there is something to say - it stays
+    // hidden until the first Calculate. Unhide before writing so the
+    // aria-live region announces the change.
+    $("results-card").hidden = false;
     var el = $("results");
     el.textContent = text;
     el.className = cls || "";
