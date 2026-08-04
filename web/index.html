@@ -382,9 +382,23 @@
     row.classList.add("invalid");
     var err = $(FIELD_ERRS[rowId]);
     if (err) err.textContent = message;
-    var first = row.querySelector("input, select");
+    // The height row holds both unit variants; skip inputs inside the
+    // hidden one or the marking lands on a field nobody can see.
+    var first = row.querySelector("input:not([hidden] input), select");
     if (first) first.setAttribute("aria-invalid", "true");
     return true;
+  }
+
+  /* Height parsed the way the core parses it: feet required, blank
+   * inches meaning 0, combined into one number. Throws like pyFloat on
+   * unparseable input. Judging the pair as a unit is what lets a bad
+   * inches box - "abc", or a negative that drags the total below zero -
+   * light up the height row rather than falling through to age. */
+  function heightAsNumber(imperial) {
+    if (!imperial) return C.pyFloat($("height_cm").value);
+    var ft = C.pyFloat($("height_ft").value);
+    var inRaw = $("height_in").value.trim();
+    return C.ftInToCm(ft, inRaw ? C.pyFloat(inRaw) : 0);
   }
 
   /* The core reports INVALID_NUMBER / NON_POSITIVE against "age" because
@@ -395,17 +409,17 @@
   function markOffendingNumericFields(code, message) {
     var imperial = currentUnit() === "imperial";
     var checks = [
-      ["row-age", $("age").value],
-      ["row-weight", $("weight").value],
-      ["row-goal", $("goal").value]
+      ["row-age", function () { return C.pyFloat($("age").value); }],
+      ["row-weight", function () { return C.pyFloat($("weight").value); }],
+      ["row-goal", function () { return C.pyFloat($("goal").value); }],
+      ["row-height", function () { return heightAsNumber(imperial); }]
     ];
-    checks.push(["row-height", imperial ? $("height_ft").value : $("height_cm").value]);
 
     var marked = 0;
     checks.forEach(function (pair) {
       var bad = false;
       try {
-        var n = C.pyFloat(pair[1]);
+        var n = pair[1]();
         if (code === "NON_POSITIVE" && !(n > 0)) bad = true;
       } catch (e) { bad = true; }
       if (bad) {
@@ -457,7 +471,8 @@
       } else {
         markField(FIELD_ROWS[outcome.field] || "row-age", outcome.message);
       }
-      var firstBad = document.querySelector(".row.invalid input, .row.invalid select");
+      var firstBad = document.querySelector(
+        ".row.invalid input:not([hidden] input), .row.invalid select");
       if (firstBad) firstBad.focus();
       return;
     }
