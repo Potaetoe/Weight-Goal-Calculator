@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install — Weight Goal Calculator</title>
+<meta name="description" content="Install the Weight Goal Calculator as an app: its own icon and window, works offline, nothing you enter is sent or stored.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fff0f5">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#241b21">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  :root {
+    --bg: #fff0f5;
+    --card: #ffffff;
+    --primary: #f4a6c6;
+    --primary-dark: #e87fa8;
+    --text: #5b4254;
+    --muted: #8a7280;
+    --focus: #c2185b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #241b21;
+      --card: #322730;
+      --primary: #e87fa8;
+      --primary-dark: #f4a6c6;
+      --text: #f5e6ee;
+      --muted: #bfa8b6;
+      --focus: #ffa8c8;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 16px 56px;
+    background: var(--bg); color: var(--text);
+    font: 16px/1.55 Verdana, Geneva, "DejaVu Sans", sans-serif;
+    display: flex; justify-content: center;
+  }
+  main { max-width: 420px; width: 100%; text-align: center; }
+  .card {
+    background: var(--card); border-radius: 14px;
+    padding: 28px 24px;
+    box-shadow: 0 1px 3px rgba(91,66,84,.08);
+  }
+  img.appicon {
+    width: 96px; height: 96px; border-radius: 22px;
+    display: block; margin: 0 auto 14px;
+  }
+  h1 { font-size: 1.3rem; line-height: 1.3; color: var(--primary-dark); margin: 0 0 6px; }
+  p.tagline { margin: 0 0 20px; color: var(--muted); font-size: .9rem; }
+  button.install {
+    width: 100%; font: inherit; font-weight: 700; font-size: 1rem;
+    background: var(--primary); color: #fff;
+    border: 0; border-radius: 12px; padding: 14px;
+    cursor: pointer;
+  }
+  button.install:hover { background: var(--primary-dark); }
+  button.install:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  #install-how { margin: 14px 0 0; font-size: .88rem; text-align: left; }
+  p.alt { margin: 18px 0 0; font-size: .85rem; color: var(--muted); }
+  p.alt a { color: inherit; }
+  footer { margin-top: 16px; font-size: .78rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <img class="appicon" src="icons/icon-192.png" alt="" width="96" height="96">
+    <h1>Weight Goal Calculator</h1>
+    <p class="tagline">
+      Calorie needs and a realistic timeline toward a weight goal.
+      Works offline. Nothing you enter is sent or stored.
+    </p>
+    <button type="button" class="install" id="install-btn">Install this app</button>
+    <p id="install-how" hidden></p>
+    <p class="alt">
+      Prefer not to install? <a href="index.html">Use it in your browser</a> —
+      it's the same calculator.
+    </p>
+  </div>
+  <footer>
+    For entertainment and general informational purposes only —
+    not medical advice.
+  </footer>
+</main>
+
+<script src="install.js"></script>
+<script>
+// Registering here too lets someone who lands on this page first
+// install without a detour: the manifest plus this scope-wide worker
+// is what makes the browser consider the app installable.
+if ("serviceWorker" in navigator &&
+    (location.protocol === "https:" ||
+     location.hostname === "localhost" ||
+     location.hostname === "127.0.0.1")) {
+  navigator.serviceWorker.register("sw.js").catch(function () {
+    /* Best-effort enhancement; nothing to do if it is refused. */
+  });
+}
+InstallUX.setup({
+  card: null,  // this page's whole purpose is the button; never hide it
+  button: document.getElementById("install-btn"),
+  how: document.getElementById("install-how")
+});
+</script>
+</body>
+</html>

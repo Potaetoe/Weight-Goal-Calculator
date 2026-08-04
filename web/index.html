@@ -158,6 +158,12 @@
     routine, especially if you have any underlying health conditions.
   </div>
 
+  <div class="card" id="install-card" hidden style="margin-top:18px; margin-bottom:0">
+    <p class="label" style="margin:0 0 8px">Get the app</p>
+    <button type="button" class="calc" id="install-btn" style="margin-bottom:0">Install this app</button>
+    <p id="install-how" hidden style="margin:10px 0 0; font-size:.88rem"></p>
+  </div>
+
   <form id="form" class="card" novalidate style="margin-top:18px">
     <fieldset>
       <legend>Units</legend>
@@ -243,12 +249,6 @@
 
   <div class="card">
     <p id="results" class="placeholder" role="status" aria-live="polite">Your results will appear here.</p>
-  </div>
-
-  <div class="card" id="install-card" hidden>
-    <p class="label" style="margin:0 0 8px">Get the app</p>
-    <button type="button" class="calc" id="install-btn" style="margin-bottom:0">Install this app</button>
-    <p id="install-how" hidden style="margin:10px 0 0; font-size:.88rem"></p>
   </div>
 
   <footer>
@@ -520,84 +520,19 @@ if ("serviceWorker" in navigator &&
   });
 }
 </script>
+<script src="install.js"></script>
 <script>
-// In-page install button. No URL can trigger installation directly -
-// browsers require a user gesture on the page - so the closest thing
-// to an "install link" is ?install, which reveals this card, scrolls
-// to it, and focuses the button: one tap from the native dialog.
-(function () {
-  "use strict";
-  var card = document.getElementById("install-card");
-  var btn = document.getElementById("install-btn");
-  var how = document.getElementById("install-how");
-  var pending = null;  // the deferred beforeinstallprompt event
-
-  var wantsInstall = /(?:^|[?&])install(?:=|&|$)/.test(location.search);
-  var standalone = (window.matchMedia &&
-      matchMedia("(display-mode: standalone)").matches) ||
-    window.navigator.standalone === true;
-  var iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-
-  // Already running as an app, or opened from file:// where install
-  // does not exist: the card would be noise either way.
-  if (standalone || location.protocol === "file:") return;
-
-  function explain(text) {
-    how.textContent = text;
-    how.hidden = false;
-  }
-
-  function instructions() {
-    if (iOS) {
-      return "On iPhone or iPad: open this page in Safari, tap Share, " +
-        "then “Add to Home Screen”.";
-    }
-    return "In Chrome or Edge: use the install icon at the right end " +
-      "of the address bar, or the browser menu → “Install " +
-      "page as app”. In Safari on a Mac: File → Add to Dock. " +
-      "On iPhone or iPad: Share → Add to Home Screen.";
-  }
-
-  // Chromium fires this when the page qualifies for installation.
-  // Deferring it to the button replaces the browser's easy-to-miss
-  // address-bar icon with a visible one-tap control.
-  window.addEventListener("beforeinstallprompt", function (e) {
-    e.preventDefault();
-    pending = e;
-    how.hidden = true;
-    card.hidden = false;
-  });
-
-  window.addEventListener("appinstalled", function () {
-    pending = null;
-    card.hidden = true;
-  });
-
-  btn.addEventListener("click", function () {
-    if (pending) {
-      // A deferred event can only prompt() once; if the user dismisses
-      // the dialog, later clicks fall through to the instructions
-      // (Chromium re-fires beforeinstallprompt when it allows a retry).
-      var p = pending;
-      pending = null;
-      p.prompt();
-      return;
-    }
-    explain(instructions());
-  });
-
-  if (wantsInstall) {
-    card.hidden = false;
-    if (iOS) explain(instructions());
-    // Give beforeinstallprompt a beat to arrive, then present the
-    // card; if the event never comes, the click explains instead.
-    setTimeout(function () {
-      card.scrollIntoView({ block: "center", behavior: "smooth" });
-      btn.focus({ preventScroll: true });
-    }, 400);
-  }
-})();
+// The card sits at the top of the page and stays hidden until either
+// the browser says the page is installable (beforeinstallprompt) or
+// the visitor arrived via a shared ?install link, which also scrolls
+// to and focuses the button. install.html is the dedicated page for
+// people being sent an install link; this card is the in-app path.
+InstallUX.setup({
+  card: document.getElementById("install-card"),
+  button: document.getElementById("install-btn"),
+  how: document.getElementById("install-how"),
+  focus: /(?:^|[?&])install(?:=|&|$)/.test(location.search)
+});
 </script>
 </body>
 </html>

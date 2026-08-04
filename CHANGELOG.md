@@ -4,6 +4,25 @@ Notable changes to the Weight Goal Calculator, newest first. Dates are
 commit dates. The web version deploys to GitHub Pages on every push to
 `main`, so entries there go live immediately.
 
+## 2026-08-04 — Dedicated install page, install card moved to the top
+
+### Added
+- `web/install.html` — a standalone page whose only job is
+  installation: app icon, one-line description, a single **Install
+  this app** button, and a link back to the in-browser calculator.
+  This is the URL to send people.
+- `web/install.js` — the install-button logic, extracted so
+  `index.html` and `install.html` share one copy instead of drifting
+  (the same reasoning as `calc_core.js`).
+
+### Changed
+- The calculator page's install card moved from below the results to
+  the top of the page, above the form.
+- Service worker shell now includes the install page and shared
+  script (cache bumped to `wgc-shell-v2`).
+- Deploy workflow's asset guard now also requires `install.html` and
+  `install.js`.
+
 ## 2026-08-04 — In-page install button and ?install share link
 
 ### Added

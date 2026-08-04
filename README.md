@@ -84,6 +84,8 @@ it sends nothing anywhere and stores nothing.
 | `web/selftest.html` | Open it to check `calc_core.js` against `fixture.js`. |
 | `web/manifest.json` | App metadata that makes the page installable. |
 | `web/sw.js` | Service worker: offline support for the installed app. |
+| `web/install.html` | Dedicated install page — the link to send people. |
+| `web/install.js` | Install-button logic shared by `index.html` and `install.html`. |
 | `web/icons/` | Generated app icons — regenerate with `tools/gen_icons.py`. |
 
 ### Installing it as an app
@@ -100,20 +102,24 @@ connection:
   Add to Home screen*.
 - **iOS / iPadOS:** in Safari, tap *Share → Add to Home Screen*.
 
-The page also shows its own **Install this app** button when the
-browser allows a one-tap install (or, elsewhere, per-platform
-instructions on click). To send someone straight to it, share the URL
-with `?install` appended:
+**To send someone an install link, share the dedicated install page:**
 
 ```
-https://potaetoe.github.io/Weight-Goal-Calculator/?install
+https://potaetoe.github.io/Weight-Goal-Calculator/install.html
 ```
 
-That link opens the page with the install button revealed, scrolled
-into view, and focused. It is deliberately one tap away rather than
-zero: no URL can trigger installation directly — every browser
-requires a gesture on the page — so this is as close to an "install
-link" as the platform permits.
+It shows the app icon, a one-line description, and a single **Install
+this app** button — the native install dialog where the browser
+offers one (Chrome, Edge, Android), and the per-platform steps where
+it doesn't (iOS, desktop Safari, Firefox). It is deliberately one tap
+away rather than zero: no URL can trigger installation directly —
+every browser requires a gesture on the page — so this is as close to
+an "install link" as the platform permits.
+
+The calculator page carries the same button in a card at the top,
+shown whenever the browser allows a one-tap install; appending
+`?install` to the calculator's URL reveals that card immediately and
+focuses it.
 
 The installed app updates itself the next time it is opened with a
 connection — the service worker always prefers the network and only
