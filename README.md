@@ -174,25 +174,29 @@ port is correct.
 
 ### Deploying
 
-`.github/workflows/deploy.yml` runs on every push to `main` **or**
-`development`, and publishes two things to the one GitHub Pages site:
+`.github/workflows/deploy.yml` runs on every push to `main` and publishes
+**two builds of that same commit** to the one GitHub Pages site:
 
-| URL | Built from | Contains |
-| --- | --- | --- |
-| `/Weight-Goal-Calculator/` | `main` | The product. Self-test stripped. |
-| `/Weight-Goal-Calculator/preview/` | `development` | Everything, self-test included. Not indexed. |
+| URL | Contains |
+| --- | --- |
+| `/Weight-Goal-Calculator/` | The product. Self-test stripped. |
+| `/Weight-Goal-Calculator/preview/` | The same source untouched, self-test included. Not indexed. |
 
-Day-to-day work lands on `development` and is testable on real HTTPS at
-the preview URL — service worker, PWA install, the actual Pages
-environment — without touching what visitors see. `main` only moves when
-a merge is called for, and that is what changes production.
+There is deliberately no second branch. The two builds differ only at
+build time: the production build removes `selftest.html`, `selftest.js`,
+`fixture.js`, and any `<!-- dev-only -->` blocks that link to them.
 
-Pages hosts a single site per repository and every deploy replaces it
-wholesale, so there is no way to publish a preview without also
-republishing the root. Each deploy therefore rebuilds both, taking the
-root from `main` and the preview from `development` regardless of which
-branch triggered it. A push to `development` republishes a root that is
-byte-identical to what is already live, since `main` hasn't moved.
+The preview covers the two things localhost can't: installing the PWA
+from a real phone — a LAN address over plain http isn't a secure context,
+so the install prompt won't fire — and handing someone a link before it
+is the live site. Everything else is testable locally; every path in this
+app is relative, so it behaves the same at any prefix.
+
+Note that on a single branch **a push is a release.** Verify locally
+first (`python -m http.server` in `web/`, which *is* a secure context and
+does exercise the service worker). If you ever need to stage unreleased
+work where someone else can see it, that is the point at which a second
+branch earns its keep — not before.
 
 A production visitor downloads about 50 KB — the page, the core, and the
 app manifest and icons. The 1.5 MB `fixture.js` never reaches them.
@@ -201,12 +205,10 @@ app manifest and icons. The 1.5 MB `fixture.js` never reaches them.
 to **GitHub Actions**. Until that's done the deploy step fails with a
 "Pages is not enabled" error while the verification step still passes.
 
-The workflow refuses to deploy — either branch — unless three things
-hold: the Python suite passes, `web/fixture.js` matches what
-`calc_core.py` currently produces, and `node tools/run_selftest.js`
-reports zero mismatches. The gate runs against whichever branch was
-pushed, so work on `development` is verified before it can reach the
-preview, not first checked on the way into production.
+The workflow refuses to deploy unless three things hold: the Python suite
+passes, `web/fixture.js` matches what `calc_core.py` currently produces,
+and `node tools/run_selftest.js` reports zero mismatches. This gate — not
+a branch split — is what actually protects production.
 
 Those last two are the point of the pipeline, and they guard opposite
 directions of the same drift. The fixture check catches `calc_core.py`

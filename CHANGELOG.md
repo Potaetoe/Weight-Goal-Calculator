@@ -1,9 +1,37 @@
 # Changelog
 
 Notable changes to the Weight Goal Calculator, newest first. Dates are
-commit dates. Pushes to `main` publish the production site and pushes to
-`development` publish the `/preview/` site, so web entries go live as
-soon as they land on their branch.
+commit dates. Every push to `main` publishes both the production site and
+the `/preview/` build, so web entries go live as soon as they land.
+
+## 2026-08-04 — Collapsed to one branch, two builds
+
+### Changed
+- The deploy workflow builds both targets from the pushed commit rather
+  than checking out two branches. `/` is the product with the self-test
+  stripped; `/preview/` is the same source untouched. The split that
+  mattered was always build-time, never branch-time.
+- The workflow triggers on `main` only.
+
+### Removed
+- The `development` branch, along with the cross-branch checkout, the
+  merge ritual, and the branch-drift class of bug — a `sw.js` comment had
+  already auto-merged into a false statement without producing a
+  conflict, which is exactly the failure a split invites.
+
+### Notes
+- The preview survives because it covers what localhost cannot: PWA
+  install from a real phone (a LAN address over plain http is not a
+  secure context) and a shareable pre-release link. Everything else is
+  testable locally — every path in the app is relative, so it behaves
+  identically at any prefix, and `localhost` is a secure context, so the
+  service worker registers there.
+- **A push is now a release.** The tradeoff accepted: no staging of
+  unreleased work where others can see it. Bring a second branch back if
+  and when that is actually needed.
+- What protects production is the gate — 104 Python tests, fixture
+  freshness, and 27,402 self-test checks, all before any deploy — not the
+  number of branches.
 
 ## 2026-08-04 — Two-branch pipeline: production from main, preview from development
 

@@ -7,31 +7,31 @@ name: Verify and deploy
 # which is the one failure this pipeline exists to prevent.
 #
 # ---------------------------------------------------------------------
-# TWO BRANCHES, ONE PAGES SITE
+# ONE BRANCH, TWO BUILDS
 #
-# Pages hosts a single site per repository and every deploy replaces it
-# wholesale - there is no way to publish a preview without also
-# republishing the root. So each deploy rebuilds both, from whichever
-# branch owns each:
+# Every push publishes two builds of the same commit:
 #
-#   /          production, built from main, self-test stripped
-#   /preview/  staging,    built from development, self-test included
+#   /          the product, self-test stripped
+#   /preview/  the same source untouched, self-test included, noindex
 #
-# That means a push to development republishes the root from main's
-# current HEAD. The content is identical to what is already live (main
-# has not moved), so this is a no-op in practice - but it is why the
-# root is always taken from main and never from the pushed branch.
+# The preview exists for the things localhost cannot do: installing the
+# PWA from a real phone (a LAN address over plain http is not a secure
+# context) and handing someone a link before it is the live site.
+# Everything else about this app is testable locally - every path in it
+# is relative, so it behaves the same at any prefix.
 #
-# The two builds differ only at build time. Both branches carry the same
-# source; the production build removes the self-test files and the
-# <!-- dev-only --> blocks that link to them. Nothing about the split
-# lives in the branch contents, so development and main never conflict
-# over these files.
+# This deliberately does NOT use a second branch. The two builds differ
+# only at build time: the production build removes the self-test files
+# and the <!-- dev-only --> blocks that link to them. A branch split
+# bought nothing here except merge conflicts and the chance for a clean
+# auto-merge to quietly falsify a comment. If work ever needs staging
+# where someone else can see it before release, that is when to bring a
+# second branch back.
 # ---------------------------------------------------------------------
 
 on:
   push:
-    branches: [main, development]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -144,31 +144,18 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      # Both branches, regardless of which one triggered the run - the
-      # root always comes from main and the preview always from
-      # development. See the note at the top of this file.
-      - name: Check out main (production source)
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          path: main-src
-
-      - name: Check out development (preview source)
-        uses: actions/checkout@v4
-        with:
-          ref: development
-          path: dev-src
+      - uses: actions/checkout@v4
 
       - uses: actions/configure-pages@v5
 
-      - name: Build the production root from main
+      - name: Build the production root
         # The self-test is developer tooling, not part of the product.
         # fixture.js alone is 1.5 MB against roughly 50 KB for the whole
         # app, so publishing it would multiply the site's weight ~30x to
         # serve a page no visitor has a reason to open.
         run: |
           rm -rf _site
-          cp -r main-src/web _site
+          cp -r web _site
           rm -f _site/selftest.html _site/selftest.js _site/fixture.js
           # Drop the <!-- dev-only --> blocks, which link to the pages
           # that were just removed.
@@ -192,11 +179,12 @@ jobs:
           echo "production root ($(du -sh _site | cut -f1)):"
           ls _site
 
-      - name: Build the preview from development
-        # Published intact, self-test and all - the point of the preview
-        # is to exercise on real HTTPS what the production build strips.
+      - name: Build the preview
+        # The same commit, published intact - self-test and all. The
+        # point of the preview is to exercise on real HTTPS exactly what
+        # the production build strips.
         run: |
-          cp -r dev-src/web _site/preview
+          cp -r web _site/preview
           # Staging must not be indexed. <head> is its own line in every
           # page here, which the verify job's asset check keeps true.
           find _site/preview -name '*.html' -exec sed -i \
