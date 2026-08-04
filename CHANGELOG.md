@@ -4,6 +4,18 @@ Notable changes to the Weight Goal Calculator, newest first. Dates are
 commit dates. The web version deploys to GitHub Pages on every push to
 `main`, so entries there go live immediately.
 
+## 2026-08-04 — Word-for-word install steps on the install page
+
+### Added
+- `web/install.html` now carries a "Step-by-step instructions"
+  dropdown listing each platform — Chrome and Edge on a computer,
+  Android Chrome, iPhone/iPad Safari, Mac Safari, and Firefox — with
+  the exact, word-for-word taps and clicks for each, quoting the
+  browser's own menu labels. The visitor's platform is preselected
+  from the user agent; the dropdown covers everyone else. Firefox's
+  entry honestly says desktop Firefox cannot install web apps and
+  points at the alternatives.
+
 ## 2026-08-04 — Dedicated install page, install card moved to the top
 
 ### Added
