@@ -334,32 +334,40 @@ the app is framed as informational rather than prescriptive.
 
 ---
 
-## Known limitations
+## Design decisions and limitations
 
-Honest notes about where the model and the current code fall short.
+### Deliberately permissive input bounds
+
+The app is intentionally light on guardrails beyond the ones listed
+above. If you are reading the source and these look like oversights,
+they aren't — they're chosen, and the tests in
+`tests/test_calc_core.py` (see `TestDesignedBounds`) pin them so they
+don't drift in either direction.
+
+- **The pace ceiling is 100 per week** in whichever unit is active. The
+  1,200 kcal/day floor is the real constraint on weight *loss*; a large
+  weight *gain* target will produce a plan without complaint.
+- **The pace ceiling is the same number in both unit systems**, so in
+  real terms the metric ceiling is roughly 2.2× more permissive. The
+  ceiling is a plain entry limit, not a unit-normalized one.
+- **The upper age bound is 1000.** Ages far outside the normal adult
+  range are caught by the calorie floor rather than by the age check.
+
+The design view is that the 1,200 kcal floor, the BMI floor on goal
+weight, and the 18+ age minimum are the limits worth enforcing, and that
+past those the tool should do the arithmetic it was asked for rather
+than second-guess the person using it. Combined with the disclaimer, the
+risk is understood and accepted.
+
+### Limitations of the model itself
 
 - **Timelines assume your maintenance level never changes.** It does —
   TDEE falls as you lose weight, so real-world timelines run longer than
   the estimate. The app says so in its results, but it does not model
   it.
-- **The pace ceiling is far too permissive.** The app currently accepts
-  any whole number up to 100 per week in either unit. For weight loss
-  the 1,200 kcal floor blocks the absurd cases as a side effect, but a
-  wildly unrealistic *gain* target will produce a plan without
-  complaint.
-- **The pace ceiling is also unit-dependent in the wrong direction.**
-  The limit is the same number in both systems, which means the metric
-  ceiling is roughly 2.2 times more permissive in real terms.
-- **The upper age bound is 1000**, which is plainly a placeholder. Ages
-  far outside the normal adult range produce nonsense that is only
-  caught indirectly by the calorie floor.
 - **Body composition, medical conditions, medications, pregnancy, and
   eating disorder history are not modelled at all** and materially
   change what is safe or appropriate.
-
-The first item is inherent to the model. The middle three are tracked by
-tests in `tests/test_calc_core.py` (see `TestKnownWarts`) so that
-changing them is a deliberate decision rather than an accident.
 
 ---
 

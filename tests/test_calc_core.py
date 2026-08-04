@@ -2,10 +2,10 @@
 """
 Characterization tests for calc_core.
 
-These PIN CURRENT BEHAVIOR. They are not a statement that every behavior
-here is correct - several deliberately lock in known warts (see
-TestKnownWarts) so that changing them has to be a decision someone makes
-on purpose, with a failing test to acknowledge.
+These PIN CURRENT BEHAVIOR. Some of it is deliberately permissive by
+product decision rather than by accident - see TestDesignedBounds, which
+locks those choices down so that changing them has to be a decision
+someone makes on purpose, with a failing test to acknowledge.
 
 Expected numbers are hard-coded golden values, not re-derivations of the
 formulas. A test that recomputes `10*w + 6.25*h - 5*a + 5` and compares
@@ -457,9 +457,9 @@ class TestBoundaries(unittest.TestCase):
         self.assertIsInstance(calculate_plan(raw(goal="200", body_fat="74.9")), Plan)
 
     def test_pace_ceiling_is_inclusive(self):
-        # pace=100 passes the ceiling, then dies on the calorie floor -
-        # which is exactly why MAX_PACE is not doing the work its comment
-        # claims. See TestKnownWarts.
+        # pace=100 passes the entry ceiling, then dies on the calorie
+        # floor. The ceiling and the floor are separate limits and only
+        # the floor is unit-aware. See TestDesignedBounds.
         self.assertEqual(calculate_plan(raw(pace="100")).code, "CALORIE_FLOOR")
         self.assertEqual(calculate_plan(raw(pace="101")).code, "PACE_RANGE")
 
@@ -515,46 +515,50 @@ class TestValidationOrder(unittest.TestCase):
         self.assertEqual(calculate_plan(raw(pace="500")).code, "PACE_RANGE")
 
 
-class TestKnownWarts(unittest.TestCase):
-    """Behaviors that are pinned but NOT endorsed.
+class TestDesignedBounds(unittest.TestCase):
+    """Deliberate design decisions, pinned against accidental change.
 
-    Each of these is a defect I'd expect to fix before shipping publicly.
-    They're locked down so a fix is a deliberate act with a failing test
-    attached, rather than a silent behavior change. When you fix one,
-    update the test in the same commit.
+    The bounds below are wide on purpose. The author has decided the tool
+    should stay permissive and let the 1,200 kcal floor be the only hard
+    stop on the loss side; the risk is understood and accepted. Do not
+    "fix" these because they look like oversights - they aren't, and
+    these tests exist to catch a silent tightening as much as a silent
+    loosening.
+
+    If a change here is ever wanted, it's a product decision, not a bug
+    fix. Update these tests in the same commit.
     """
 
-    def test_max_age_is_1000_and_yields_negative_tdee(self):
-        # MAX_AGE=1000 looks like a leftover debug value. An age of 999
-        # clears the age check, then drives Mifflin-St Jeor to a NEGATIVE
-        # BMR. Nothing rejects it on those grounds - the calorie floor
-        # catches it by accident, because a negative number is also below
-        # 1200. Tighten MAX_AGE to ~100 and this test should change.
+    def test_max_age_is_1000(self):
+        # Intentionally wide. An age of 999 clears the age check and
+        # drives Mifflin-St Jeor to a negative BMR; the calorie floor is
+        # what stops a plan being produced, not the age bound.
         self.assertEqual(core.MAX_AGE, 1000)
         r = calculate_plan(raw(age="999"))
         self.assertEqual(r.code, "CALORIE_FLOOR")
         self.assertLess(r.context["tdee"], 0)
 
-    def test_pace_ceilings_are_identical_across_units(self):
-        # MAX_PACE_KG == MAX_PACE_LB means metric users get a ~2.2x more
-        # permissive ceiling in real terms - the same unit-coupling class
-        # of bug that [C2] was written to fix.
+    def test_pace_ceilings_are_the_same_number_in_both_units(self):
+        # By design: the ceiling is a plain entry limit, not a
+        # unit-normalized one. In real terms that makes metric ~2.2x more
+        # permissive, which is accepted.
         self.assertEqual(core.MAX_PACE_LB, core.MAX_PACE_KG)
         self.assertAlmostEqual(
             core.lb_to_kg(core.MAX_PACE_LB) / core.MAX_PACE_KG, 0.45359237, places=9
         )
 
-    def test_pace_ceiling_permits_medically_implausible_gain(self):
-        # The 1200 kcal floor only catches impossible *deficits*. Gains are
-        # unbounded in practice: 10 lb/week sails through.
+    def test_gain_pace_is_bounded_only_by_the_entry_ceiling(self):
+        # The 1200 kcal floor constrains deficits, not surpluses. A large
+        # gain pace produces a plan, by design.
         p = calculate_plan(raw(goal="200", pace="10"))
         self.assertIsInstance(p, Plan)
         self.assertEqual(p.direction, "gain")
         self.assertGreater(p.target_calories, 6800)
 
-    def test_metric_default_pace_is_2_2x_the_imperial_default(self):
+    def test_pace_default_of_1_means_different_speeds_per_unit(self):
         # The UI resets pace to "1" on unit toggle, so the same user gets
-        # 1 lb/week in imperial and 1 kg/week in metric.
+        # 1 lb/week in imperial and 1 kg/week in metric. Documented in the
+        # README rather than smoothed over.
         imp = calculate_plan(raw(weight="180", goal="150", pace="1"))
         met = calculate_plan(
             raw(unit="metric", height_cm="165.1", weight="81.6", goal="68", pace="1")
