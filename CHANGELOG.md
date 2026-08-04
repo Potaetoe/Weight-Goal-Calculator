@@ -4,6 +4,20 @@ Notable changes to the Weight Goal Calculator, newest first. Dates are
 commit dates. The web version deploys to GitHub Pages on every push to
 `main`, so entries there go live immediately.
 
+## 2026-08-04 — New app icon
+
+### Changed
+- The app icon is now a man and a woman standing together on a scale,
+  from a vector illustration supplied by the project owner, recolored
+  to the brand palette: white silhouettes and a plum scale on the
+  brand pink. Replaces the gauge dial.
+- `tools/gen_icons.py` is now a tiny SVG rasterizer (still standard
+  library only): the illustration's path data is embedded in the
+  script and rendered via bézier flattening, nonzero-winding scanline
+  fill, and supersampled anti-aliasing, so the icons remain
+  reproducible from the repo. The artwork is scaled slightly inward
+  to clear the maskable safe zone.
+
 ## 2026-08-04 — Quieter pages: collapsed instructions, no empty results card
 
 ### Changed
