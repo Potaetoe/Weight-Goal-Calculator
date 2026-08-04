@@ -2,10 +2,9 @@
 """
 Weight Goal Calculator
 -----------------------
-A simple, friendly tool that estimates calorie needs and a realistic
-timeline for reaching a weight goal. Uses the Mifflin-St Jeor equation,
-which research shows holds up better across a wide range of body sizes
-than older formulas like Harris-Benedict.
+A simple tool that estimates calorie needs and a realistic timeline for
+reaching a weight goal. Uses the Mifflin-St Jeor equation, or
+Katch-McArdle when body fat percentage is supplied.
 
 DISCLAIMER: This tool is for entertainment and general informational
 purposes only. It is NOT medical advice and is not a substitute for
@@ -13,6 +12,33 @@ guidance from a registered dietitian, nutritionist, or physician.
 Always consult a qualified healthcare professional before making
 changes to your diet, exercise, or weight management plan, especially
 if you have any underlying health conditions.
+
+---------------------------------------------------------------------------
+CHANGES FROM ORIGINAL  (each marked inline with a [Cn] tag)
+
+  [C1] Target pace is now a user-entered whole number bound to the active
+       unit, replacing the pace_options list / pace_map dict pair. Removes
+       the dual-list coupling that raised KeyError when the two drifted.
+  [C2] Pace is interpreted in the displayed unit (lb/week in Imperial,
+       kg/week in Metric). Previously pace_map returned kg regardless of
+       mode, so every Imperial user ran ~10% faster than the label claimed.
+  [C3] Pace is bounded. Free text entry with no ceiling produces negative
+       target_calories, which the original printed verbatim.
+  [C4] The 1200 kcal floor is now an actual floor. It blocks plan output
+       instead of appending a warning beneath an already-displayed number.
+  [C5] Unit toggle now converts existing entry values. Previously it
+       relabelled only, so 165 lb silently became 165 kg on switch.
+  [C6] Age bounds. Mifflin-St Jeor is not validated for children, and a
+       weight-loss timeline generator should not accept a minor's inputs.
+  [C7] Goal weight is checked against a BMI floor. The original accepted
+       any goal above zero and would generate a confident plan for an
+       arbitrarily low target.
+  [C8] Mouse wheel binding now works on X11 as well as Windows/macOS.
+
+  To strip the additions beyond the pace change, delete the blocks tagged
+  [C5], [C6], [C7], [C8]. [C4] is load-bearing for [C3] — removing it
+  reintroduces impossible calorie targets at low TDEE.
+---------------------------------------------------------------------------
 """
 
 import tkinter as tk
@@ -47,6 +73,14 @@ KG_PER_LB = 0.45359237
 CM_PER_IN = 2.54
 CAL_PER_KG_FAT = 7700  # commonly used approximation
 
+# --- Bounds ----------------------------------------------------------------
+MAX_PACE_LB = 100          # [C3] whole lb per week
+MAX_PACE_KG = 100          # [C3] whole kg per week
+CALORIE_FLOOR = 1200     # [C4] hard floor, not a warning threshold
+MIN_AGE = 18             # [C6]
+MAX_AGE = 1000            # [C6]
+MIN_GOAL_BMI = 18.5      # [C7] standard adult underweight threshold
+
 
 def lb_to_kg(lb):
     return lb * KG_PER_LB
@@ -60,14 +94,20 @@ def in_to_cm(inches):
     return inches * CM_PER_IN
 
 
+def cm_to_in(cm):
+    return cm / CM_PER_IN
+
+
 class WeightCalculatorApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Weight Goal Calculator")
         self.configure(bg=COLOR_BG)
-        self.geometry("520x720")
+        self.geometry("520x760")
         self.minsize(480, 680)
         self.resizable(True, True)
+
+        self._prev_unit = "imperial"  # [C5] tracks last unit for conversion
 
         self._build_style()
         self._build_layout()
@@ -149,11 +189,22 @@ class WeightCalculatorApp(tk.Tk):
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # Mouse wheel scrolling
+        # [C8] Wheel scrolling. Windows/macOS deliver <MouseWheel> with a
+        # delta; X11 delivers Button-4 / Button-5 instead.
         def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            if event.num == 4:
+                canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                canvas.yview_scroll(1, "units")
+            else:
+                delta = event.delta
+                if abs(delta) >= 120:
+                    delta = delta / 120
+                canvas.yview_scroll(int(-1 * delta), "units")
 
         canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        canvas.bind_all("<Button-4>", _on_mousewheel)
+        canvas.bind_all("<Button-5>", _on_mousewheel)
 
         root = scroll_frame
 
@@ -251,21 +302,21 @@ class WeightCalculatorApp(tk.Tk):
             justify="left",
         ).grid(row=7, column=0, columnspan=2, sticky="w", pady=(0, 6))
 
-        # Weekly rate goal
-        ttk.Label(form, text="Target pace:", style="Card.TLabel").grid(
-            row=8, column=0, sticky="w", pady=6
+        # [C1] Target pace: free whole-number entry, replaces the combobox.
+        self.pace_label = ttk.Label(form, text="Target pace (lb/week):", style="Card.TLabel")
+        self.pace_label.grid(row=8, column=0, sticky="w", pady=6)
+        pace_frame = ttk.Frame(form, style="Card.TFrame")
+        pace_frame.grid(row=8, column=1, sticky="w")
+        self.pace_entry = ttk.Entry(pace_frame, width=8)
+        self.pace_entry.insert(0, "1")
+        self.pace_entry.pack(side="left")
+        self.pace_hint = ttk.Label(
+            pace_frame,
+            text=f" whole number, 1-{MAX_PACE_LB}",
+            style="Card.TLabel",
+            font=FONT_SMALL,
         )
-        self.pace_var = tk.StringVar(value="0.5 kg / 1 lb per week (moderate)")
-        pace_options = [
-            "0.25 kg / 0.5 lb per week (gentle)",
-            "0.5 kg / 1 lb per week (moderate)",
-            "0.75 kg / 1.5 lb per week (aggressive)",
-            "1 kg / 2 lb per week (max recommended)",
-        ]
-        pace_combo = ttk.Combobox(
-            form, textvariable=self.pace_var, values=pace_options, state="readonly", width=30
-        )
-        pace_combo.grid(row=8, column=1, sticky="w")
+        self.pace_hint.pack(side="left", padx=(6, 0))
 
         # Calculate button
         calc_btn = ttk.Button(root, text="Calculate", command=self._calculate)
@@ -285,7 +336,7 @@ class WeightCalculatorApp(tk.Tk):
         disclaimer = tk.Label(
             root,
             text=(
-                "⚠ For entertainment and general informational purposes only. "
+                "\u26a0 For entertainment and general informational purposes only. "
                 "This is not medical advice and is not a substitute for guidance "
                 "from a registered dietitian, nutritionist, or physician. Always "
                 "consult a qualified healthcare professional before making changes "
@@ -307,15 +358,57 @@ class WeightCalculatorApp(tk.Tk):
         card.pack(fill="x", pady=8)
         return card
 
+    # ------------------------------------------------------------------
+    # Unit handling
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _convert_entry(entry, fn):
+        """[C5] Convert an entry's value in place. Blank/invalid left alone."""
+        raw = entry.get().strip()
+        if not raw:
+            return
+        try:
+            val = float(raw)
+        except ValueError:
+            return
+        entry.delete(0, tk.END)
+        entry.insert(0, f"{fn(val):g}")
+
     def _update_unit_labels(self):
-        if self.unit_var.get() == "imperial":
+        new_unit = self.unit_var.get()
+
+        # [C5] Convert existing values so a toggle can't silently reinterpret
+        # 165 lb as 165 kg. Rounded to one decimal for readability.
+        if new_unit != self._prev_unit:
+            if new_unit == "metric":
+                self._convert_entry(self.height_entry, lambda v: round(in_to_cm(v), 1))
+                self._convert_entry(self.weight_entry, lambda v: round(lb_to_kg(v), 1))
+                self._convert_entry(self.goal_entry, lambda v: round(lb_to_kg(v), 1))
+            else:
+                self._convert_entry(self.height_entry, lambda v: round(cm_to_in(v), 1))
+                self._convert_entry(self.weight_entry, lambda v: round(kg_to_lb(v), 1))
+                self._convert_entry(self.goal_entry, lambda v: round(kg_to_lb(v), 1))
+            # Pace is a small integer with different ceilings per unit;
+            # converting it produces confusing rounding, so reset to default.
+            self.pace_entry.delete(0, tk.END)
+            self.pace_entry.insert(0, "1")
+            self._prev_unit = new_unit
+
+        if new_unit == "imperial":
             self.height_label.config(text="Height (in):")
             self.weight_label.config(text="Current weight (lb):")
             self.goal_label.config(text="Goal weight (lb):")
+            self.pace_label.config(text="Target pace (lb/week):")
+            self.pace_hint.config(text=f" whole number, 1-{MAX_PACE_LB}")
         else:
             self.height_label.config(text="Height (cm):")
             self.weight_label.config(text="Current weight (kg):")
             self.goal_label.config(text="Goal weight (kg):")
+            self.pace_label.config(text="Target pace (kg/week):")
+            self.pace_hint.config(
+                text=f" whole number, 1-{MAX_PACE_KG}"
+                if MAX_PACE_KG > 1 else " whole number, 1 only"
+            )
 
     # ------------------------------------------------------------------
     # Calculation
@@ -327,11 +420,26 @@ class WeightCalculatorApp(tk.Tk):
             weight_raw = float(self.weight_entry.get())
             goal_raw = float(self.goal_entry.get())
         except ValueError:
-            messagebox.showerror("Missing or invalid input", "Please enter valid numbers for age, height, current weight, and goal weight.")
+            messagebox.showerror(
+                "Missing or invalid input",
+                "Please enter valid numbers for age, height, current weight, and goal weight.",
+            )
             return
 
         if age <= 0 or height_raw <= 0 or weight_raw <= 0 or goal_raw <= 0:
             messagebox.showerror("Invalid input", "All values must be greater than zero.")
+            return
+
+        # [C6] Age bounds. Mifflin-St Jeor and the activity multipliers are
+        # adult figures; this tool has no valid output for children.
+        if age < MIN_AGE or age > MAX_AGE:
+            messagebox.showerror(
+                "Age out of range",
+                f"This calculator supports ages {MIN_AGE}-{MAX_AGE}.\n\n"
+                "The formulas it uses are validated for adults only. If you are "
+                "under 18, please speak with a doctor or a registered dietitian "
+                "rather than using a calculator.",
+            )
             return
 
         # Normalize to metric for the math
@@ -340,15 +448,34 @@ class WeightCalculatorApp(tk.Tk):
             weight_kg = lb_to_kg(weight_raw)
             goal_kg = lb_to_kg(goal_raw)
             unit_label = "lb"
-            display_weight = weight_raw
-            display_goal = goal_raw
         else:
             height_cm = height_raw
             weight_kg = weight_raw
             goal_kg = goal_raw
             unit_label = "kg"
-            display_weight = weight_raw
-            display_goal = goal_raw
+
+        display_weight = weight_raw
+        display_goal = goal_raw
+
+        # [C7] Goal weight sanity check against a BMI floor. The original
+        # accepted any positive goal and produced a confident timeline.
+        height_m = height_cm / 100.0
+        goal_bmi = goal_kg / (height_m ** 2)
+        if goal_bmi < MIN_GOAL_BMI:
+            min_goal_kg = MIN_GOAL_BMI * (height_m ** 2)
+            min_goal_display = (
+                kg_to_lb(min_goal_kg) if unit_label == "lb" else min_goal_kg
+            )
+            messagebox.showerror(
+                "Goal weight out of range",
+                f"A goal of {display_goal:g} {unit_label} at your height falls below "
+                f"a BMI of {MIN_GOAL_BMI}, the standard adult underweight threshold.\n\n"
+                f"This calculator will not generate a plan below roughly "
+                f"{min_goal_display:.0f} {unit_label}.\n\n"
+                "If you believe a lower target is right for you, that is a "
+                "conversation for a physician or registered dietitian.",
+            )
+            return
 
         # Optional body fat % -> Katch-McArdle if provided, else Mifflin-St Jeor
         bodyfat_raw = self.bodyfat_entry.get().strip()
@@ -366,7 +493,6 @@ class WeightCalculatorApp(tk.Tk):
             bmr = 370 + (21.6 * lean_mass_kg)
             formula_used = "Katch-McArdle"
         else:
-            # Mifflin-St Jeor BMR
             if self.sex_var.get() == "male":
                 bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) + 5
             else:
@@ -375,14 +501,40 @@ class WeightCalculatorApp(tk.Tk):
         activity_factor = ACTIVITY_LEVELS[self.activity_var.get()]
         tdee = bmr * activity_factor
 
-        # Weekly pace -> kg/week
-        pace_map = {
-            "0.25 kg / 0.5 lb per week (gentle)": 0.25,
-            "0.5 kg / 1 lb per week (moderate)": 0.5,
-            "0.75 kg / 1.5 lb per week (aggressive)": 0.75,
-            "1 kg / 2 lb per week (max recommended)": 1.0,
-        }
-        kg_per_week = pace_map[self.pace_var.get()]
+        # [C1][C2][C3] Weekly pace: user-entered whole number, interpreted in
+        # the active display unit, bounded.
+        pace_raw = self.pace_entry.get().strip()
+        try:
+            pace_val = int(pace_raw)
+        except ValueError:
+            messagebox.showerror("Invalid pace", "Target pace must be a whole number.")
+            return
+
+        if pace_val <= 0:
+            messagebox.showerror("Invalid pace", "Target pace must be greater than zero.")
+            return
+
+        if self.unit_var.get() == "imperial":
+            if pace_val > MAX_PACE_LB:
+                messagebox.showerror(
+                    "Pace out of range",
+                    f"Maximum supported pace is {MAX_PACE_LB} lb per week.\n\n"
+                    "Faster rates fall outside the range this calculator's model "
+                    "is valid for and would produce unreliable results.",
+                )
+                return
+            kg_per_week = lb_to_kg(pace_val)
+        else:
+            if pace_val > MAX_PACE_KG:
+                messagebox.showerror(
+                    "Pace out of range",
+                    f"Maximum supported pace is {MAX_PACE_KG} kg per week.\n\n"
+                    "Faster rates fall outside the range this calculator's model "
+                    "is valid for and would produce unreliable results.",
+                )
+                return
+            kg_per_week = float(pace_val)
+
         daily_deficit_or_surplus = (kg_per_week * CAL_PER_KG_FAT) / 7
 
         weight_diff_kg = goal_kg - weight_kg  # positive = gain, negative = loss
@@ -400,9 +552,19 @@ class WeightCalculatorApp(tk.Tk):
             target_calories = tdee - daily_deficit_or_surplus
             weeks_needed = abs(weight_diff_kg) / kg_per_week
 
-        # Sanity floor: don't recommend below ~1200 kcal commonly cited as a
-        # general floor for safe unsupervised intake (still flagged in UI).
-        low_calorie_warning = target_calories < 1200
+        # [C4] Hard floor. The original computed this as a boolean and printed
+        # the out-of-range number anyway with a warning underneath it.
+        if direction != "maintain" and target_calories < CALORIE_FLOOR:
+            self.results_label.config(
+                text=(
+                    "No plan generated.\n\n"
+                    "The selected pace would require intake below "
+                    f"{CALORIE_FLOOR:,} kcal/day for your inputs, which is outside "
+                    "the range this tool will produce a plan for.\n\n"
+                    "Try a slower pace, or speak with a healthcare provider."
+                )
+            )
+            return
 
         weeks_needed_display = round(weeks_needed, 1)
         months_needed_display = round(weeks_needed / 4.345, 1) if weeks_needed else 0
@@ -415,11 +577,13 @@ class WeightCalculatorApp(tk.Tk):
         ]
 
         if direction == "maintain":
-            result_lines.append(f"You're already at your goal weight. Eat around {tdee:,.0f} kcal/day to maintain.")
+            result_lines.append(
+                f"You're already at your goal weight. Eat around {tdee:,.0f} kcal/day to maintain."
+            )
         else:
             verb = "gain" if direction == "gain" else "lose"
             result_lines.append(
-                f"To {verb} weight at your selected pace, aim for about "
+                f"To {verb} weight at {pace_val} {unit_label}/week, aim for about "
                 f"{target_calories:,.0f} kcal/day."
             )
             result_lines.append(
@@ -432,13 +596,10 @@ class WeightCalculatorApp(tk.Tk):
                 f"{display_weight:g} {unit_label}: "
                 f"~{weeks_needed_display} weeks (~{months_needed_display} months)."
             )
-
-        if low_calorie_warning:
             result_lines.append("")
             result_lines.append(
-                "⚠ The calculated target falls below 1,200 kcal/day, a commonly "
-                "cited general floor for unsupervised intake. Please consult a "
-                "healthcare provider before pursuing a deficit this large."
+                "Note: this timeline assumes your maintenance level stays constant. "
+                "It falls as you lose weight, so real-world timelines run longer."
             )
 
         self.results_label.config(text="\n".join(result_lines))
