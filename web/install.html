@@ -5,31 +5,63 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Install — Weight Goal Calculator</title>
 <meta name="description" content="Install the Weight Goal Calculator as an app: its own icon and window, works offline, nothing you enter is sent or stored.">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fff0f5">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2efe9">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#241b21">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script>
+// Apply the theme chosen on the calculator page before first paint,
+// so navigating between the two pages doesn't flash palettes.
+(function () {
+  try {
+    var t = localStorage.getItem("wgc-theme");
+    if (t) document.documentElement.setAttribute("data-theme", t);
+  } catch (e) { /* storage may be blocked; the default palette is fine */ }
+})();
+</script>
 <style>
+  /* "Pink", the default: deep plum with pink accents. */
   :root {
-    --bg: #fff0f5;
-    --card: #ffffff;
-    --primary: #f4a6c6;
-    --primary-dark: #e87fa8;
-    --text: #5b4254;
-    --muted: #8a7280;
-    --focus: #c2185b;
+    --bg: #241b21;
+    --card: #322730;
+    --primary: #e87fa8;
+    --primary-dark: #f4a6c6;
+    --text: #f5e6ee;
+    --muted: #bfa8b6;
+    --focus: #ffa8c8;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #241b21;
-      --card: #322730;
-      --primary: #e87fa8;
-      --primary-dark: #f4a6c6;
-      --text: #f5e6ee;
-      --muted: #bfa8b6;
-      --focus: #ffa8c8;
+  /* Same three palettes as index.html: no saved choice follows the
+     system (Light on a light-preferring one), a data-theme attribute
+     written by the calculator's theme picker wins in both directions. */
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme]) {
+      --bg: #f2efe9;
+      --card: #faf8f4;
+      --primary: #5f7d59;
+      --primary-dark: #47613f;
+      --text: #3a3d35;
+      --muted: #77796d;
+      --focus: #3e5a38;
     }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121212;
+    --card: #1e1e1e;
+    --primary: #3b82f6;
+    --primary-dark: #60a5fa;
+    --text: #e4e4e7;
+    --muted: #a1a1aa;
+    --focus: #93c5fd;
+  }
+  :root[data-theme="light"] {
+    --bg: #f2efe9;
+    --card: #faf8f4;
+    --primary: #5f7d59;
+    --primary-dark: #47613f;
+    --text: #3a3d35;
+    --muted: #77796d;
+    --focus: #3e5a38;
   }
   * { box-sizing: border-box; }
   body {
@@ -75,6 +107,7 @@
   p.alt { margin: 18px 0 0; font-size: .85rem; color: var(--muted); }
   p.alt a { color: inherit; }
   footer { margin-top: 16px; font-size: .78rem; color: var(--muted); }
+  footer a { color: inherit; }
 </style>
 </head>
 <body>
@@ -99,6 +132,9 @@
     </p>
   </div>
   <footer>
+    <nav aria-label="Pages" style="margin-bottom:8px">
+      <a href="index.html">← Open the calculator</a>
+    </nav>
     For entertainment and general informational purposes only —
     not medical advice.
   </footer>

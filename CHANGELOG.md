@@ -4,6 +4,36 @@ Notable changes to the Weight Goal Calculator, newest first. Dates are
 commit dates. The web version deploys to GitHub Pages on every push to
 `main`, so entries there go live immediately.
 
+## 2026-08-04 — Page redesign: themes, footer navigation, warning moved
+
+### Added
+- Three selectable themes on the calculator page, picked from chip
+  buttons in the footer: **Pink** (the default — the deep plum with
+  pink accents that was previously the dark-mode palette), **Light**
+  (natural linen/stone neutrals with a muted sage accent —
+  deliberately not bright), and **Dark** (a standard neutral web
+  dark: near-black surfaces, gray text, blue accent). With no choice
+  made, a light-preferring system gets Light and everything else
+  gets Pink; a choice is saved on the device (`localStorage`, the
+  only thing the site stores) and applied before first paint so
+  there is no flash. The install page follows the saved theme too.
+  The old bright pastel palette is retired.
+- Footer navigation on both pages: the calculator links to the
+  install page and the self-test; the install page links back to the
+  calculator.
+
+### Changed
+- The medical-disclaimer warning moved from the top of the calculator
+  page to the bottom, above the footer.
+- The browser-chrome color (`theme-color`) now tracks the selected
+  palette.
+
+### Removed
+- The "Get the app" install card no longer appears on the calculator
+  page — installation now lives on `install.html`, reachable from the
+  footer. `?install` links redirect there, so previously shared URLs
+  keep working.
+
 ## 2026-08-04 — Word-for-word install steps on the install page
 
 ### Added

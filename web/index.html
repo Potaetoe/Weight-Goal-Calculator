@@ -5,39 +5,90 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Weight Goal Calculator</title>
 <meta name="description" content="Estimate your calorie needs and a realistic timeline toward a weight goal. Runs entirely in your browser.">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fff0f5">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2efe9">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#241b21">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<style>
-  :root {
-    --bg: #fff0f5;
-    --card: #ffffff;
-    --primary: #f4a6c6;
-    --primary-dark: #e87fa8;
-    --text: #5b4254;
-    --muted: #8a7280;
-    --line: #f0dbe5;
-    --warn-bg: #fde2e2;
-    --warn-text: #8a3b3b;
-    --field-bg: #ffffff;
-    --focus: #c2185b;
+<script>
+// Two things that must run before first paint:
+// 1. Old shared links used ?install to reveal an in-page card; that
+//    card now lives on its own page, so honour those links.
+// 2. Apply a saved theme now, so the page doesn't flash the default
+//    palette before the footer script runs.
+(function () {
+  if (/(?:^|[?&])install(?:=|&|$)/.test(location.search)) {
+    location.replace("install.html");
+    return;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #241b21;
-      --card: #322730;
-      --primary: #e87fa8;
-      --primary-dark: #f4a6c6;
-      --text: #f5e6ee;
-      --muted: #bfa8b6;
-      --line: #473942;
-      --warn-bg: #4a2626;
-      --warn-text: #f3b0b0;
-      --field-bg: #241b21;
-      --focus: #ffa8c8;
+  try {
+    var t = localStorage.getItem("wgc-theme");
+    if (t) document.documentElement.setAttribute("data-theme", t);
+  } catch (e) { /* storage may be blocked; the default palette is fine */ }
+})();
+</script>
+<style>
+  /* "Pink", the default: deep plum with pink accents. */
+  :root {
+    --bg: #241b21;
+    --card: #322730;
+    --primary: #e87fa8;
+    --primary-dark: #f4a6c6;
+    --text: #f5e6ee;
+    --muted: #bfa8b6;
+    --line: #473942;
+    --warn-bg: #4a2626;
+    --warn-text: #f3b0b0;
+    --field-bg: #241b21;
+    --focus: #ffa8c8;
+  }
+  /* With no saved choice, a light-preferring system gets the Light
+     theme. Once a theme is picked, the data-theme attribute wins in
+     both directions. Keep in sync with [data-theme="light"] below. */
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme]) {
+      --bg: #f2efe9;
+      --card: #faf8f4;
+      --primary: #5f7d59;
+      --primary-dark: #47613f;
+      --text: #3a3d35;
+      --muted: #77796d;
+      --line: #ddd8cb;
+      --warn-bg: #ece0d3;
+      --warn-text: #7a4a33;
+      --field-bg: #ffffff;
+      --focus: #3e5a38;
     }
+  }
+  /* "Dark": a standard neutral web dark - near-black surfaces, gray
+     text, blue accent. */
+  :root[data-theme="dark"] {
+    --bg: #121212;
+    --card: #1e1e1e;
+    --primary: #3b82f6;
+    --primary-dark: #60a5fa;
+    --text: #e4e4e7;
+    --muted: #a1a1aa;
+    --line: #33333a;
+    --warn-bg: #3a2222;
+    --warn-text: #f2b8b5;
+    --field-bg: #121212;
+    --focus: #93c5fd;
+  }
+  /* "Light" is deliberately natural rather than bright: linen and
+     stone neutrals with a muted sage accent. */
+  :root[data-theme="light"] {
+    --bg: #f2efe9;
+    --card: #faf8f4;
+    --primary: #5f7d59;
+    --primary-dark: #47613f;
+    --text: #3a3d35;
+    --muted: #77796d;
+    --line: #ddd8cb;
+    --warn-bg: #ece0d3;
+    --warn-text: #7a4a33;
+    --field-bg: #ffffff;
+    --focus: #3e5a38;
   }
 
   * { box-sizing: border-box; }
@@ -137,6 +188,21 @@
   .disclaimer strong { display: block; margin-bottom: 4px; }
   footer { margin-top: 18px; font-size: .78rem; color: var(--muted); }
   footer a { color: inherit; }
+  .foot-nav { margin: 0 0 12px; font-size: .85rem; }
+  .foot-nav a { margin-right: 14px; }
+  .theme-row {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    margin: 0 0 12px;
+  }
+  .theme-row button {
+    font: inherit; font-size: .8rem; padding: 5px 14px;
+    border: 2px solid var(--line); border-radius: 999px;
+    background: var(--field-bg); color: var(--text); cursor: pointer;
+  }
+  .theme-row button[aria-pressed="true"] {
+    border-color: var(--primary-dark); background: var(--primary);
+    color: #fff; font-weight: 700;
+  }
 
   @media (max-width: 420px) {
     body { padding: 16px 12px 40px; }
@@ -150,21 +216,7 @@
   <h1>Weight Goal Calculator</h1>
   <p class="tagline">Estimate your calorie needs and a realistic timeline.</p>
 
-  <div class="disclaimer" role="note">
-    <strong>⚠ For entertainment and general informational purposes only.</strong>
-    This is not medical advice and is not a substitute for guidance from a
-    registered dietitian, nutritionist, or physician. Always consult a
-    qualified healthcare professional before changing your diet or exercise
-    routine, especially if you have any underlying health conditions.
-  </div>
-
-  <div class="card" id="install-card" hidden style="margin-top:18px; margin-bottom:0">
-    <p class="label" style="margin:0 0 8px">Get the app</p>
-    <button type="button" class="calc" id="install-btn" style="margin-bottom:0">Install this app</button>
-    <p id="install-how" hidden style="margin:10px 0 0; font-size:.88rem"></p>
-  </div>
-
-  <form id="form" class="card" novalidate style="margin-top:18px">
+  <form id="form" class="card" novalidate>
     <fieldset>
       <legend>Units</legend>
       <div class="segmented">
@@ -251,9 +303,27 @@
     <p id="results" class="placeholder" role="status" aria-live="polite">Your results will appear here.</p>
   </div>
 
+  <div class="disclaimer" role="note">
+    <strong>⚠ For entertainment and general informational purposes only.</strong>
+    This is not medical advice and is not a substitute for guidance from a
+    registered dietitian, nutritionist, or physician. Always consult a
+    qualified healthcare professional before changing your diet or exercise
+    routine, especially if you have any underlying health conditions.
+  </div>
+
   <footer>
+    <nav class="foot-nav" aria-label="Pages">
+      <a href="install.html">Install the app</a>
+      <a href="selftest.html">Core self-test</a>
+    </nav>
+    <div class="theme-row" role="group" aria-label="Theme">
+      <span>Theme:</span>
+      <button type="button" data-set-theme="pink" aria-pressed="false">Pink</button>
+      <button type="button" data-set-theme="light" aria-pressed="false">Light</button>
+      <button type="button" data-set-theme="dark" aria-pressed="false">Dark</button>
+    </div>
     Runs entirely in your browser. Nothing you type is sent anywhere or
-    stored. <a href="selftest.html">Core self-test</a>.
+    stored. Your theme choice is saved on this device only.
   </footer>
 </main>
 
@@ -520,19 +590,43 @@ if ("serviceWorker" in navigator &&
   });
 }
 </script>
-<script src="install.js"></script>
 <script>
-// The card sits at the top of the page and stays hidden until either
-// the browser says the page is installable (beforeinstallprompt) or
-// the visitor arrived via a shared ?install link, which also scrolls
-// to and focuses the button. install.html is the dedicated page for
-// people being sent an install link; this card is the in-app path.
-InstallUX.setup({
-  card: document.getElementById("install-card"),
-  button: document.getElementById("install-btn"),
-  how: document.getElementById("install-how"),
-  focus: /(?:^|[?&])install(?:=|&|$)/.test(location.search)
-});
+// Theme picker. A saved choice was already applied pre-paint by the
+// head script; this wires the buttons and keeps the browser-chrome
+// color (meta theme-color) in step with the palette.
+(function () {
+  "use strict";
+  var KEY = "wgc-theme";
+  var BG = { pink: "#241b21", light: "#f2efe9", dark: "#121212" };
+  var buttons = document.querySelectorAll("[data-set-theme]");
+
+  function apply(name) {
+    document.documentElement.setAttribute("data-theme", name);
+    Array.prototype.forEach.call(
+      document.querySelectorAll('meta[name="theme-color"]'),
+      function (m) { m.setAttribute("content", BG[name]); }
+    );
+    Array.prototype.forEach.call(buttons, function (b) {
+      b.setAttribute("aria-pressed",
+        String(b.getAttribute("data-set-theme") === name));
+    });
+  }
+
+  var stored = null;
+  try { stored = localStorage.getItem(KEY); } catch (e) {}
+  // No saved choice: reflect what the CSS is already doing (Light on
+  // a light-preferring system, Pink otherwise) without persisting.
+  apply(stored || (window.matchMedia &&
+    matchMedia("(prefers-color-scheme: light)").matches ? "light" : "pink"));
+
+  Array.prototype.forEach.call(buttons, function (b) {
+    b.addEventListener("click", function () {
+      var name = b.getAttribute("data-set-theme");
+      apply(name);
+      try { localStorage.setItem(KEY, name); } catch (e) {}
+    });
+  });
+})();
 </script>
 </body>
 </html>

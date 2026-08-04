@@ -116,10 +116,9 @@ away rather than zero: no URL can trigger installation directly —
 every browser requires a gesture on the page — so this is as close to
 an "install link" as the platform permits.
 
-The calculator page carries the same button in a card at the top,
-shown whenever the browser allows a one-tap install; appending
-`?install` to the calculator's URL reveals that card immediately and
-focuses it.
+The calculator page links to the install page from its footer, and
+appending `?install` to the calculator's URL redirects there (so
+older shared links keep working).
 
 The installed app updates itself the next time it is opened with a
 connection — the service worker always prefers the network and only
@@ -186,7 +185,13 @@ differs where the desktop conventions don't suit a web page:
   modal dialog, and when several numeric fields are wrong at once the
   page marks each one rather than showing a single combined message.
 - The results area announces itself to screen readers when it updates.
-- The page follows your system light/dark preference.
+- Three selectable themes, picked from the footer: **Pink** (the
+  default — deep plum with pink accents), **Light** (natural linen
+  and sage neutrals), and **Dark** (a standard neutral web dark).
+  With no choice made, a light-preferring system gets Light and
+  everything else gets Pink; a choice is saved on your device (that
+  saved theme name is the only thing the page ever stores) and
+  applies to the install page too.
 
 ---
 
