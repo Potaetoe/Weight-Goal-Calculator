@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Weight Goal Calculator</title>
 <meta name="description" content="Estimate your calorie needs and a realistic timeline toward a weight goal. Runs entirely in your browser.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fff0f5">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#241b21">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
   :root {
     --bg: #fff0f5;
@@ -494,6 +499,20 @@
 
   updateUnits();
 })();
+</script>
+<script>
+// Installable-app support. Registration is skipped, not attempted and
+// failed, on file:// - double-clicking index.html must keep working
+// exactly as the README promises. The page is identical without it;
+// the worker only adds installability and offline reloads.
+if ("serviceWorker" in navigator &&
+    (location.protocol === "https:" ||
+     location.hostname === "localhost" ||
+     location.hostname === "127.0.0.1")) {
+  navigator.serviceWorker.register("sw.js").catch(function () {
+    /* Best-effort enhancement; nothing to do if it is refused. */
+  });
+}
 </script>
 </body>
 </html>

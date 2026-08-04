@@ -87,7 +87,13 @@ jobs:
           test -f web/index.html
           test -f web/calc_core.js
           test -f web/selftest.html
+          test -f web/manifest.json
+          test -f web/sw.js
+          test -f web/icons/icon-192.png
+          test -f web/icons/icon-512.png
+          test -f web/icons/apple-touch-icon.png
           grep -q 'src="calc_core.js"' web/index.html
+          grep -q 'rel="manifest"' web/index.html
           echo "web/ looks deployable"
 
   deploy:

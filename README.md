@@ -59,7 +59,9 @@ ahead if you already know a step.
 | `Run Weight Calculator.bat` | Windows double-click launcher. |
 | `web/` | Browser version — see [The web version](#the-web-version). |
 | `tools/gen_web_fixture.py` | Regenerates the fixture the web version is checked against. |
+| `tools/gen_icons.py` | Regenerates the app icons in `web/icons/`. |
 | `requirements.txt` | Intentionally empty — see below. |
+| `CHANGELOG.md` | Notable changes, newest first. |
 
 The split exists so the calculation logic can be tested on its own, and
 so it can be reimplemented for other front-ends without untangling it
@@ -80,6 +82,34 @@ it sends nothing anywhere and stores nothing.
 | `web/calc_core.js` | Port of `calc_core.py`. Same formulas, bounds, validation order, rejection codes, and copy. |
 | `web/fixture.js` | Generated expected-output data captured from the Python core. Do not edit by hand. |
 | `web/selftest.html` | Open it to check `calc_core.js` against `fixture.js`. |
+| `web/manifest.json` | App metadata that makes the page installable. |
+| `web/sw.js` | Service worker: offline support for the installed app. |
+| `web/icons/` | Generated app icons — regenerate with `tools/gen_icons.py`. |
+
+### Installing it as an app
+
+When the page is served over HTTPS (the GitHub Pages deployment
+qualifies), browsers offer to install it as a standalone app — its own
+icon and window, no address bar, and it keeps working with no
+connection:
+
+- **Chrome / Edge on desktop:** click the install icon at the right
+  end of the address bar, or *⋮ menu → Cast, save and share → Install
+  page as app*.
+- **Android:** Chrome shows an "Install app" banner, or use *⋮ menu →
+  Add to Home screen*.
+- **iOS / iPadOS:** in Safari, tap *Share → Add to Home Screen*.
+
+The installed app updates itself the next time it is opened with a
+connection — the service worker always prefers the network and only
+falls back to its cached copy offline, so it can never pin you to a
+stale version. Opening `index.html` from a `file://` path is
+unaffected: the service worker never registers there, and the page
+behaves exactly as before.
+
+The self-test is deliberately excluded from offline support — it is a
+development tool, and caching its 1.5 MB fixture would multiply the
+installed footprint roughly 30×.
 
 ### Verifying the port
 
@@ -107,9 +137,9 @@ exists to catch.
 ### Deploying
 
 `.github/workflows/deploy.yml` publishes `web/` to GitHub Pages on every
-push to `main`. A visitor downloads about 39 KB — `index.html` plus
-`calc_core.js`. The 1.5 MB `fixture.js` is only fetched by someone who
-opens the self-test.
+push to `main`. A visitor downloads about 50 KB — the page, the core,
+and the app manifest and icons. The 1.5 MB `fixture.js` is only fetched
+by someone who opens the self-test.
 
 **One-time setup:** in the repository's *Settings → Pages*, set **Source**
 to **GitHub Actions**. Until that's done the deploy step fails with a
