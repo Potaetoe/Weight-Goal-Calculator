@@ -16,13 +16,14 @@
  * multiply the installed footprint roughly 30x.
  */
 
-var CACHE = "wgc-shell-v2";
+var CACHE = "wgc-shell-v3";
 var SHELL = [
   "./",
   "index.html",
   "calc_core.js",
   "install.html",
   "install.js",
+  "theme.js",
   "manifest.json",
   "icons/icon-192.png",
   "icons/icon-512.png",

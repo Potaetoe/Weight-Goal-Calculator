@@ -91,6 +91,7 @@ jobs:
           test -f web/sw.js
           test -f web/install.html
           test -f web/install.js
+          test -f web/theme.js
           test -f web/icons/icon-192.png
           test -f web/icons/icon-512.png
           test -f web/icons/apple-touch-icon.png

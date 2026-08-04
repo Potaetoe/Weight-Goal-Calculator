@@ -192,7 +192,8 @@
   .foot-nav a { margin-right: 14px; }
   .theme-row {
     display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-    margin: 0 0 12px;
+    justify-content: center; margin: 0 0 14px;
+    font-size: .8rem; color: var(--muted);
   }
   .theme-row button {
     font: inherit; font-size: .8rem; padding: 5px 14px;
@@ -213,6 +214,13 @@
 </head>
 <body>
 <main>
+  <div class="theme-row" role="group" aria-label="Theme">
+    <span>Theme:</span>
+    <button type="button" data-set-theme="pink" aria-pressed="false">Pink</button>
+    <button type="button" data-set-theme="light" aria-pressed="false">Light</button>
+    <button type="button" data-set-theme="dark" aria-pressed="false">Dark</button>
+  </div>
+
   <h1>Weight Goal Calculator</h1>
   <p class="tagline">Estimate your calorie needs and a realistic timeline.</p>
 
@@ -316,12 +324,6 @@
       <a href="install.html">Install the app</a>
       <a href="selftest.html">Core self-test</a>
     </nav>
-    <div class="theme-row" role="group" aria-label="Theme">
-      <span>Theme:</span>
-      <button type="button" data-set-theme="pink" aria-pressed="false">Pink</button>
-      <button type="button" data-set-theme="light" aria-pressed="false">Light</button>
-      <button type="button" data-set-theme="dark" aria-pressed="false">Dark</button>
-    </div>
     Runs entirely in your browser. Nothing you type is sent anywhere or
     stored. Your theme choice is saved on this device only.
   </footer>
@@ -594,43 +596,6 @@ if ("serviceWorker" in navigator &&
   });
 }
 </script>
-<script>
-// Theme picker. A saved choice was already applied pre-paint by the
-// head script; this wires the buttons and keeps the browser-chrome
-// color (meta theme-color) in step with the palette.
-(function () {
-  "use strict";
-  var KEY = "wgc-theme";
-  var BG = { pink: "#241b21", light: "#f2efe9", dark: "#121212" };
-  var buttons = document.querySelectorAll("[data-set-theme]");
-
-  function apply(name) {
-    document.documentElement.setAttribute("data-theme", name);
-    Array.prototype.forEach.call(
-      document.querySelectorAll('meta[name="theme-color"]'),
-      function (m) { m.setAttribute("content", BG[name]); }
-    );
-    Array.prototype.forEach.call(buttons, function (b) {
-      b.setAttribute("aria-pressed",
-        String(b.getAttribute("data-set-theme") === name));
-    });
-  }
-
-  var stored = null;
-  try { stored = localStorage.getItem(KEY); } catch (e) {}
-  // No saved choice: reflect what the CSS is already doing (Light on
-  // a light-preferring system, Pink otherwise) without persisting.
-  apply(stored || (window.matchMedia &&
-    matchMedia("(prefers-color-scheme: light)").matches ? "light" : "pink"));
-
-  Array.prototype.forEach.call(buttons, function (b) {
-    b.addEventListener("click", function () {
-      var name = b.getAttribute("data-set-theme");
-      apply(name);
-      try { localStorage.setItem(KEY, name); } catch (e) {}
-    });
-  });
-})();
-</script>
+<script src="theme.js"></script>
 </body>
 </html>

@@ -117,10 +117,34 @@
   p.alt a { color: inherit; }
   footer { margin-top: 16px; font-size: .78rem; color: var(--muted); }
   footer a { color: inherit; }
+  .theme-row {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    justify-content: center; margin: 0 0 16px;
+    font-size: .8rem; color: var(--muted);
+  }
+  .theme-row button {
+    font: inherit; font-size: .8rem; padding: 5px 14px;
+    border: 2px solid var(--muted); border-radius: 999px;
+    background: var(--card); color: var(--text); cursor: pointer;
+  }
+  .theme-row button[aria-pressed="true"] {
+    border-color: var(--primary-dark); background: var(--primary);
+    color: #fff; font-weight: 700;
+  }
+  .theme-row button:focus-visible {
+    outline: 3px solid var(--focus); outline-offset: 2px;
+  }
 </style>
 </head>
 <body>
 <main>
+  <div class="theme-row" role="group" aria-label="Theme">
+    <span>Theme:</span>
+    <button type="button" data-set-theme="pink" aria-pressed="false">Pink</button>
+    <button type="button" data-set-theme="light" aria-pressed="false">Light</button>
+    <button type="button" data-set-theme="dark" aria-pressed="false">Dark</button>
+  </div>
+
   <div class="card">
     <img class="appicon" src="icons/icon-192.png" alt="" width="96" height="96">
     <h1>Weight Goal Calculator</h1>
@@ -142,15 +166,13 @@
     </p>
   </div>
   <footer>
-    <nav aria-label="Pages" style="margin-bottom:8px">
-      <a href="index.html">← Open the calculator</a>
-    </nav>
     For entertainment and general informational purposes only —
     not medical advice.
   </footer>
 </main>
 
 <script src="install.js"></script>
+<script src="theme.js"></script>
 <script>
 // Registering here too lets someone who lands on this page first
 // install without a detour: the manifest plus this scope-wide worker

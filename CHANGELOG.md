@@ -4,6 +4,22 @@ Notable changes to the Weight Goal Calculator, newest first. Dates are
 commit dates. The web version deploys to GitHub Pages on every push to
 `main`, so entries there go live immediately.
 
+## 2026-08-04 — Theme selector moved to the top, on both pages
+
+### Changed
+- The theme chips (Pink / Light / Dark) moved from the calculator's
+  footer to the top of the page, right-aligned above the title — and
+  the install page now has the same selector, where before it only
+  followed the choice made elsewhere.
+- The picker logic moved into `web/theme.js`, shared by both pages
+  (same anti-drift reasoning as `install.js`); service worker shell
+  updated accordingly (cache `wgc-shell-v3`), deploy guard requires
+  the new file.
+
+### Removed
+- The install page's footer "Open the calculator" link — redundant
+  with the "Use it in your browser" link in the card above it.
+
 ## 2026-08-04 — New app icon
 
 ### Changed

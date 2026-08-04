@@ -86,6 +86,7 @@ it sends nothing anywhere and stores nothing.
 | `web/sw.js` | Service worker: offline support for the installed app. |
 | `web/install.html` | Dedicated install page — the link to send people. |
 | `web/install.js` | Install-button logic shared by `index.html` and `install.html`. |
+| `web/theme.js` | Theme-picker logic shared by both pages. |
 | `web/icons/` | Generated app icons — regenerate with `tools/gen_icons.py`. |
 
 ### Installing it as an app
@@ -185,13 +186,13 @@ differs where the desktop conventions don't suit a web page:
   modal dialog, and when several numeric fields are wrong at once the
   page marks each one rather than showing a single combined message.
 - The results area announces itself to screen readers when it updates.
-- Three selectable themes, picked from the footer: **Pink** (the
-  default — deep plum with pink accents), **Light** (natural linen
-  and sage neutrals), and **Dark** (a standard neutral web dark).
-  With no choice made, a light-preferring system gets Light and
-  everything else gets Pink; a choice is saved on your device (that
-  saved theme name is the only thing the page ever stores) and
-  applies to the install page too.
+- Three selectable themes, picked from chips at the top of either
+  page: **Pink** (the default — deep plum with pink accents),
+  **Light** (natural linen and sage neutrals), and **Dark** (a
+  standard neutral web dark). With no choice made, a light-preferring
+  system gets Light and everything else gets Pink; a choice is saved
+  on your device (that saved theme name is the only thing the page
+  ever stores) and applies across both pages.
 
 ---
 
