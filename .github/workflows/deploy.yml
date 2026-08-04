@@ -80,6 +80,20 @@ jobs:
           print("fixture matches the current calc_core.py")
           PY
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run the browser core's self-test
+        # The step above proves fixture.js still matches calc_core.py.
+        # This one proves calc_core.js still matches fixture.js - the
+        # other half, and the one that decides whether the page people
+        # actually load computes the right answers. Without it nothing
+        # in this pipeline ever executes a line of the JavaScript it
+        # deploys. Same checks the browser page runs; see
+        # tools/run_selftest.js.
+        run: node tools/run_selftest.js
+
       - name: Check the page's assets exist
         # Cheap guard against a rename breaking the deployed page: the
         # browser would just 404 the script and render a dead form.
@@ -87,6 +101,7 @@ jobs:
           test -f web/index.html
           test -f web/calc_core.js
           test -f web/selftest.html
+          test -f web/selftest.js
           test -f web/manifest.json
           test -f web/sw.js
           test -f web/install.html

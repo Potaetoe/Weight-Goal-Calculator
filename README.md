@@ -82,6 +82,7 @@ it sends nothing anywhere and stores nothing.
 | `web/calc_core.js` | Port of `calc_core.py`. Same formulas, bounds, validation order, rejection codes, and copy. |
 | `web/fixture.js` | Generated expected-output data captured from the Python core. Do not edit by hand. |
 | `web/selftest.html` | Open it to check `calc_core.js` against `fixture.js`. |
+| `web/selftest.js` | The self-test's checks. Shared by that page and the CI runner, so both mean the same thing by "PASS". |
 | `web/manifest.json` | App metadata that makes the page installable. |
 | `web/sw.js` | Service worker: offline support for the installed app. |
 | `web/install.html` | Dedicated install page — the link to send people. |
@@ -139,6 +140,16 @@ Open `web/selftest.html` in a browser; it should report **PASS** with
 zero mismatches across ~27,000 checks — every formula, every rejection
 message, every rendered results line, and the number-formatting helpers.
 
+The same checks run without a browser, which is how CI gates the deploy:
+
+```bash
+node tools/run_selftest.js
+```
+
+It prints the same per-group table and exits non-zero on any mismatch.
+Node is needed only for that runner — the app itself still has no build
+step and no dependencies.
+
 If you change `calc_core.py`, regenerate the fixture and re-check:
 
 ```bash
@@ -155,6 +166,11 @@ so the app and the self-test run *the same code*. Inlining it would mean
 two copies, and a copy that quietly drifts is exactly what the self-test
 exists to catch.
 
+`web/selftest.js` is split out for the same reason one level up: the page
+you open and the runner CI blocks the deploy on share one definition of
+what the checks are, instead of two that can disagree about whether the
+port is correct.
+
 ### Deploying
 
 `.github/workflows/deploy.yml` publishes `web/` to GitHub Pages on every
@@ -166,12 +182,20 @@ by someone who opens the self-test.
 to **GitHub Actions**. Until that's done the deploy step fails with a
 "Pages is not enabled" error while the verification step still passes.
 
-The workflow refuses to deploy unless the Python suite passes *and*
-`web/fixture.js` matches what `calc_core.py` currently produces. That
-second check is the point of the pipeline: a stale fixture would leave
-the published self-test comparing `calc_core.js` against outdated
-expectations, so it could show a confident green PASS while the two
-implementations had actually drifted apart.
+The workflow refuses to deploy unless three things hold: the Python
+suite passes, `web/fixture.js` matches what `calc_core.py` currently
+produces, and `node tools/run_selftest.js` reports zero mismatches.
+
+Those last two are the point of the pipeline, and they guard opposite
+directions of the same drift. The fixture check catches `calc_core.py`
+moving away from `fixture.js` — a stale fixture would leave the
+published self-test comparing `calc_core.js` against outdated
+expectations, showing a confident green PASS while the two
+implementations had actually drifted apart. The self-test run catches
+`calc_core.js` moving away from `fixture.js`, which is what decides
+whether the page people actually load computes the right answers.
+Without it the pipeline would publish the JavaScript without ever
+executing a line of it.
 
 It also clones with full history, because `tests/test_equivalence.py`
 skips rather than fails when the commit it replays isn't reachable — a

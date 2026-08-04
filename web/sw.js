@@ -11,9 +11,9 @@
  * Network-first costs one request per load and can never serve stale
  * code while online; the cache only answers when the network cannot.
  *
- * selftest.html and fixture.js are deliberately not cached: the
- * self-test is a development tool, and its 1.5 MB fixture would
- * multiply the installed footprint roughly 30x.
+ * selftest.html, selftest.js and fixture.js are deliberately not
+ * cached: the self-test is a development tool, and its 1.5 MB fixture
+ * would multiply the installed footprint roughly 30x.
  */
 
 var CACHE = "wgc-shell-v3";

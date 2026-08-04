@@ -4,6 +4,33 @@ Notable changes to the Weight Goal Calculator, newest first. Dates are
 commit dates. The web version deploys to GitHub Pages on every push to
 `main`, so entries there go live immediately.
 
+## 2026-08-04 — CI now runs the browser self-test; a test that wasn't testing
+
+### Added
+- `tools/run_selftest.js` runs the browser core's self-test headlessly
+  under Node, and the deploy workflow now blocks on it. The pipeline
+  previously verified the Python side and the freshness of
+  `web/fixture.js`, then published `web/` without ever executing a
+  line of the JavaScript: that caught `calc_core.py` drifting away
+  from the fixture, but not `calc_core.js` drifting away from it —
+  the direction the self-test is actually for. A broken port could go
+  green and ship, with nothing between it and users but somebody
+  remembering to open `selftest.html` by hand.
+- `web/selftest.js` holds the checks themselves, now shared by that
+  page and the CI runner. Same reasoning as `calc_core.js` being a
+  `<script src>` and not inline copy: two copies of the checks could
+  disagree about what "PASS" means. Check counts are unchanged —
+  27,402 across 1,478 plan cases.
+
+### Fixed
+- `tests/test_formatting.py`'s rejection-routing test now derives the
+  set of codes from `calc_core.py`'s source instead of asserting two
+  hardcoded counts. Its comment claimed it guarded against a rejection
+  code being added without a routing decision; it could not — `seen`
+  was built from a fixed list of eleven inputs, so a twelfth code left
+  both counts unchanged and the test still passed. It now names the
+  orphaned code and fails.
+
 ## 2026-08-04 — Theme selector moved to the top, on both pages
 
 ### Changed

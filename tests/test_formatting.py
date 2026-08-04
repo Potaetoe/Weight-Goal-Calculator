@@ -13,6 +13,8 @@ Skipped entirely if tkinter is unavailable (importing weight_calculator
 pulls it in), so the suite still runs on a headless box.
 """
 
+import inspect
+import re
 import unittest
 
 import calc_core as core
@@ -25,6 +27,21 @@ except Exception:  # pragma: no cover - environment dependent
     HAVE_TK = False
 
 ACT = list(core.ACTIVITY_LEVELS)
+
+
+def declared_rejection_codes():
+    """Every rejection code calc_core can return, read out of its source.
+
+    Derived rather than listed, because a hand-maintained list has the
+    exact staleness problem it would be there to prevent: someone adds a
+    Rejection and forgets to update it. The `code="..."` literals are the
+    one place that cannot fall out of sync with the code.
+
+    If the source ever stops spelling codes as double-quoted literals,
+    this returns an empty set and the routing test below fails loudly
+    rather than quietly checking nothing.
+    """
+    return set(re.findall(r'code="([A-Z_]+)"', inspect.getsource(core)))
 
 
 def plan(**overrides):
@@ -132,11 +149,21 @@ class TestRejectionRouting(unittest.TestCase):
             self.assertFalse(outcome.ok)
             self.assertNotIn(outcome.code, wc.RESULTS_CARD_CODES)
             seen.add(outcome.code)
-        # Guards against a rejection code being added without a routing
-        # decision being made for it. 11 dialog codes + CALORIE_FLOOR
-        # inline = the 12 codes calc_core can currently return.
-        self.assertEqual(len(seen), 11)
-        self.assertEqual(len(seen | wc.RESULTS_CARD_CODES), 12)
+
+        # The actual guard: every code calc_core declares has to be
+        # accounted for, either by an input above that provokes it (and
+        # is therefore checked to route to a dialog) or by the inline
+        # set. Add a rejection to calc_core without deciding how it
+        # reaches the user and this fails, naming the orphan.
+        declared = declared_rejection_codes()
+        routed = seen | wc.RESULTS_CARD_CODES
+        self.assertEqual(
+            routed, declared,
+            "rejection codes with no routing decision: %s; "
+            "codes routed but no longer in calc_core: %s"
+            % (sorted(declared - routed) or "none",
+               sorted(routed - declared) or "none"),
+        )
 
 
 if __name__ == "__main__":
