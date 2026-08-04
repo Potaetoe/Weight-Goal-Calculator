@@ -81,7 +81,7 @@ it sends nothing anywhere and stores nothing.
 | `web/index.html` | The page: markup, styling, and form wiring. |
 | `web/calc_core.js` | Port of `calc_core.py`. Same formulas, bounds, validation order, rejection codes, and copy. |
 | `web/fixture.js` | Generated expected-output data captured from the Python core. Do not edit by hand. |
-| `web/selftest.html` | Open it to check `calc_core.js` against `fixture.js`. |
+| `web/selftest.html` | Open it locally to check `calc_core.js` against `fixture.js`. Not published — see [Deploying](#deploying). |
 | `web/selftest.js` | The self-test's checks. Shared by that page and the CI runner, so both mean the same thing by "PASS". |
 | `web/manifest.json` | App metadata that makes the page installable. |
 | `web/sw.js` | Service worker: offline support for the installed app. |
@@ -129,16 +129,19 @@ stale version. Opening `index.html` from a `file://` path is
 unaffected: the service worker never registers there, and the page
 behaves exactly as before.
 
-The self-test is deliberately excluded from offline support — it is a
-development tool, and caching its 1.5 MB fixture would multiply the
-installed footprint roughly 30×.
+The self-test isn't part of the installed app, or of the published site
+at all — it is developer tooling, and its 1.5 MB fixture would multiply
+the footprint roughly 30× to carry a page no visitor has a reason to
+open.
 
 ### Verifying the port
 
 The web core is correct exactly insofar as it reproduces `fixture.js`.
-Open `web/selftest.html` in a browser; it should report **PASS** with
-zero mismatches across ~27,000 checks — every formula, every rejection
-message, every rendered results line, and the number-formatting helpers.
+Open your local `web/selftest.html` in a browser; it should report
+**PASS** with zero mismatches across ~27,000 checks — every formula,
+every rejection message, every rendered results line, and the
+number-formatting helpers. (It is not on the deployed site; it ships
+with the repo, not to visitors.)
 
 The same checks run without a browser, which is how CI gates the deploy:
 
@@ -174,9 +177,16 @@ port is correct.
 ### Deploying
 
 `.github/workflows/deploy.yml` publishes `web/` to GitHub Pages on every
-push to `main`. A visitor downloads about 50 KB — the page, the core,
-and the app manifest and icons. The 1.5 MB `fixture.js` is only fetched
-by someone who opens the self-test.
+push to `main` — minus the self-test. `selftest.html`, `selftest.js` and
+`fixture.js` are stripped from a staged copy before upload, so what goes
+live is the product and nothing else: a visitor downloads about 50 KB,
+the page, the core, and the app manifest and icons. The 1.5 MB
+`fixture.js` never leaves the repository.
+
+The files stay in version control and the verify job still runs them —
+unshipping the harness is not the same as deleting it. The staging step
+also fails the deploy if a published page still links to any of the
+three, so the footer link can't quietly become a 404.
 
 **One-time setup:** in the repository's *Settings → Pages*, set **Source**
 to **GitHub Actions**. Until that's done the deploy step fails with a
@@ -189,9 +199,9 @@ produces, and `node tools/run_selftest.js` reports zero mismatches.
 Those last two are the point of the pipeline, and they guard opposite
 directions of the same drift. The fixture check catches `calc_core.py`
 moving away from `fixture.js` — a stale fixture would leave the
-published self-test comparing `calc_core.js` against outdated
-expectations, showing a confident green PASS while the two
-implementations had actually drifted apart. The self-test run catches
+self-test comparing `calc_core.js` against outdated expectations,
+showing a confident green PASS while the two implementations had
+actually drifted apart. The self-test run catches
 `calc_core.js` moving away from `fixture.js`, which is what decides
 whether the page people actually load computes the right answers.
 Without it the pipeline would publish the JavaScript without ever

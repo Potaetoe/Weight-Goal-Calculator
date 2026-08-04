@@ -125,9 +125,37 @@ jobs:
 
       - uses: actions/configure-pages@v5
 
+      - name: Stage the site without the self-test
+        # The self-test is developer tooling, not part of the product.
+        # It stays in the repo - the verify job above runs it, and it is
+        # still openable locally - but it is not published: fixture.js
+        # alone is 1.5 MB against roughly 50 KB for the whole app, so
+        # shipping it would multiply the site's weight ~30x to serve a
+        # page no visitor has a reason to open.
+        run: |
+          rm -rf _site
+          cp -r web _site
+          rm -f _site/selftest.html _site/selftest.js _site/fixture.js
+          # Fail rather than publish if any of them survived the copy,
+          # and catch a link in the shipped pages that would now 404.
+          for f in selftest.html selftest.js fixture.js; do
+            if [ -e "_site/$f" ]; then
+              echo "::error::$f is still in the staged site"
+              exit 1
+            fi
+          done
+          if grep -rn 'selftest\.html\|selftest\.js\|fixture\.js' \
+               --include='*.html' --include='*.json' _site; then
+            echo "::error::a published page still references the " \
+                 "self-test, which is not deployed - that link would 404"
+            exit 1
+          fi
+          echo "staged $(du -sh _site | cut -f1) to publish:"
+          ls _site
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: web
+          path: _site
 
       - id: deployment
         uses: actions/deploy-pages@v4

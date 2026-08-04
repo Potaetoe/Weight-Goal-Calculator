@@ -4,6 +4,25 @@ Notable changes to the Weight Goal Calculator, newest first. Dates are
 commit dates. The web version deploys to GitHub Pages on every push to
 `main`, so entries there go live immediately.
 
+## 2026-08-04 — The self-test is no longer published
+
+### Changed
+- The deploy job now stages a copy of `web/` with `selftest.html`,
+  `selftest.js` and `fixture.js` removed, and publishes that. The
+  self-test is developer tooling: `fixture.js` alone is 1.5 MB against
+  roughly 50 KB for the whole app, so shipping it multiplied the site's
+  weight ~30× to serve a page no visitor had a reason to open. The
+  files stay in version control and the verify job still runs them —
+  unshipping the harness is not the same as deleting it.
+- The staging step fails the deploy if any of the three survive the
+  copy, or if a published page still links to one, so a live 404 can't
+  slip through.
+
+### Removed
+- The calculator footer's "Core self-test" link, which pointed at a
+  page that is no longer deployed. Open `web/selftest.html` from a
+  local checkout instead.
+
 ## 2026-08-04 — CI now runs the browser self-test; a test that wasn't testing
 
 ### Added
