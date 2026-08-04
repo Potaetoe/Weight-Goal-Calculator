@@ -25,13 +25,14 @@ connection required.
 - Calculates your **TDEE** (Total Daily Energy Expenditure) by factoring
   in your activity level.
 - Recommends a daily calorie target based on a weight gain or loss goal
-  and a pace you choose (gentle, moderate, aggressive, or max
-  recommended).
+  and a weekly pace you enter.
 - Estimates how many weeks/months it will take to reach your goal at
   that pace.
-- Warns you if the recommended calorie target drops below a commonly
-  cited safe floor (1,200 kcal/day) for unsupervised dieting.
-- Supports both **imperial** (lb/in) and **metric** (kg/cm) units.
+- Supports both **imperial** (lb, ft + in) and **metric** (kg, cm)
+  units, converting your entries when you switch between them.
+- **Refuses to produce a plan** in several situations rather than
+  handing you a confident-looking number it shouldn't stand behind. See
+  [What the calculator will refuse to do](#what-the-calculator-will-refuse-to-do).
 
 ---
 
@@ -45,6 +46,22 @@ guide you step by step, even if you've never used Python before.
 If you're doing it yourself without an AI assistant, just follow the
 steps below in order. They are written for complete beginners — skip
 ahead if you already know a step.
+
+---
+
+## Project layout
+
+| File | What it is |
+| --- | --- |
+| `weight_calculator.py` | The tkinter GUI. Collects the form, displays results. Contains no arithmetic. |
+| `calc_core.py` | All the math and every accept/reject decision. Imports no GUI code and does no I/O. |
+| `tests/` | Test suite (standard library `unittest`, no pytest needed). |
+| `Run Weight Calculator.bat` | Windows double-click launcher. |
+| `requirements.txt` | Intentionally empty — see below. |
+
+The split exists so the calculation logic can be tested on its own, and
+so it can be reimplemented for other front-ends without untangling it
+from tkinter first.
 
 ---
 
@@ -175,33 +192,86 @@ python3 weight_calculator.py
 (On Windows, if `python3` doesn't work, use `python weight_calculator.py`
 instead.)
 
+**On Windows you can also just double-click `Run Weight Calculator.bat`**
+in the project folder. It finds Python for you and opens the app with no
+console window behind it. If Python isn't installed, it says so instead
+of flashing and vanishing.
+
 A pastel pink window titled "Weight Goal Calculator" should open.
+
+---
+
+## Running the tests
+
+The test suite uses only the standard library, so if you can run the
+app, you can run the tests. From the project folder:
+
+```bash
+python3 -m unittest discover -s tests -t .
+```
+
+You should see a row of dots and `OK` at the end. For a list of every
+test name as it runs, add `-v`.
+
+`tests/test_equivalence.py` compares the current code against an earlier
+version of the app pulled from git history. It **skips** rather than
+fails if that history isn't available (for example, in a shallow clone
+or a plain ZIP download), so `OK` on its own doesn't guarantee it ran —
+use `-v` if you want to confirm.
 
 ---
 
 ## How to use the app
 
-1. Choose your unit system (Imperial or Metric) at the top.
+1. Choose your unit system (Imperial or Metric) at the top. Switching
+   converts anything you've already typed, so your entries keep meaning
+   the same thing.
 2. Select your sex — this determines which BMR formula variables are
-   used.
-3. Enter your age, height, current weight, and goal weight.
-4. **Optional:** enter your body fat percentage if you know it. If you
+   used. **Note:** this setting is ignored if you fill in body fat %,
+   because the Katch-McArdle formula doesn't use it.
+3. Enter your age.
+4. Enter your height:
+   - **Imperial:** two boxes, feet and inches — for example `5` ft `9`
+     in. Leave the inches box blank for a round number of feet. The
+     inches box takes 0–11; whole feet belong in the feet box.
+   - **Metric:** a single box in centimetres.
+5. Enter your current weight and goal weight.
+6. **Optional:** enter your body fat percentage if you know it. If you
    leave this blank, the app uses the Mifflin-St Jeor formula. If you
    provide it, the app switches to Katch-McArdle, which can be more
    accurate since it accounts for lean body mass directly.
-5. Select your activity level from the dropdown.
-6. Select your target pace (how fast you want to gain or lose).
-7. Click **Calculate**.
-8. Your results — BMR, TDEE, recommended daily calories, and estimated
-   timeline — will appear in the card below the button.
+7. Select your activity level from the dropdown.
+8. Enter your target pace — a whole number in the unit you're currently
+   using, so `1` means 1 lb per week in Imperial and 1 kg per week in
+   Metric. **These are not the same speed:** 1 kg/week is roughly 2.2
+   times faster than 1 lb/week, and requires a much larger daily
+   deficit.
+9. Click **Calculate**.
+10. Your results — BMR, TDEE, recommended daily calories, and estimated
+    timeline — will appear in the card below the button.
 
-If your goal weight equals your current weight, the app will just
-recommend a maintenance calorie target.
+If your goal weight equals your current weight, the app skips the
+timeline and simply recommends a maintenance calorie target.
 
-If the recommended calorie target falls below 1,200 kcal/day, the app
-will flag this directly in the results and recommend consulting a
-healthcare provider — this commonly cited threshold is a general
-guideline, not a personalized medical limit.
+---
+
+## What the calculator will refuse to do
+
+The app declines to generate a plan in these cases. This is deliberate:
+producing a confident number outside the range the underlying formulas
+are good for would be worse than producing nothing.
+
+| Situation | What happens |
+| --- | --- |
+| The plan would need **under 1,200 kcal/day** | No plan is generated. The results area explains why and suggests a slower pace. This is a hard stop, not a warning printed under a number. |
+| **Age under 18** | Rejected. Mifflin-St Jeor and the activity multipliers are validated for adults; a calculator is the wrong tool for a minor's weight plan. |
+| **Goal weight below a BMI of 18.5** | Rejected, with the approximate lowest goal the app will accept at your height. 18.5 is the standard adult underweight threshold. |
+| **Inches outside 0–11** | Rejected. If you typed a total (say `65`) into the inches box, the message tells you what that is in feet and inches. |
+| Blank or non-numeric entries, or values at or below zero | Rejected with a message naming the problem. |
+
+The 1,200 kcal/day figure is a commonly cited general guideline for
+unsupervised dieting, not a personalized medical limit. Clearing it does
+not mean a plan is appropriate for you.
 
 ---
 
@@ -224,9 +294,16 @@ to PATH during installation — reinstall Python and check the "Add Python
 to PATH" box.
 
 **Nothing happens when I click Calculate**
-Make sure age, height, current weight, and goal weight are all filled in
-with valid numbers (no letters or symbols). Body fat % is the only
-optional field.
+Check that age, height, current weight, goal weight, and pace are all
+filled in with valid numbers (no letters or symbols). In Imperial, the
+feet box must have a value — only the inches box may be left blank. Body
+fat % is the only fully optional field.
+
+**I switched to Metric and now it says no plan can be generated**
+The pace box resets to `1` when you switch units, which means 1 kg per
+week — a far larger daily deficit than 1 lb per week. Try a pace of `1`
+in Imperial, or accept that a 1 kg/week target is aggressive enough that
+many people's numbers fall below the 1,200 kcal floor.
 
 **I get a "Permission denied" error on macOS/Linux**
 Try running with `python3 weight_calculator.py` rather than
@@ -254,6 +331,35 @@ chmod +x weight_calculator.py
 These are population-level estimates. Individual metabolism varies, and
 actual results will differ from person to person — this is exactly why
 the app is framed as informational rather than prescriptive.
+
+---
+
+## Known limitations
+
+Honest notes about where the model and the current code fall short.
+
+- **Timelines assume your maintenance level never changes.** It does —
+  TDEE falls as you lose weight, so real-world timelines run longer than
+  the estimate. The app says so in its results, but it does not model
+  it.
+- **The pace ceiling is far too permissive.** The app currently accepts
+  any whole number up to 100 per week in either unit. For weight loss
+  the 1,200 kcal floor blocks the absurd cases as a side effect, but a
+  wildly unrealistic *gain* target will produce a plan without
+  complaint.
+- **The pace ceiling is also unit-dependent in the wrong direction.**
+  The limit is the same number in both systems, which means the metric
+  ceiling is roughly 2.2 times more permissive in real terms.
+- **The upper age bound is 1000**, which is plainly a placeholder. Ages
+  far outside the normal adult range produce nonsense that is only
+  caught indirectly by the calorie floor.
+- **Body composition, medical conditions, medications, pregnancy, and
+  eating disorder history are not modelled at all** and materially
+  change what is safe or appropriate.
+
+The first item is inherent to the model. The middle three are tracked by
+tests in `tests/test_calc_core.py` (see `TestKnownWarts`) so that
+changing them is a deliberate decision rather than an accident.
 
 ---
 
