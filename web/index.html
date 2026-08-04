@@ -322,7 +322,12 @@
   <footer>
     <nav class="foot-nav" aria-label="Pages">
       <a href="install.html">Install the app</a>
+      <!-- dev-only:start - stripped from the production build, which
+           does not publish the self-test. Keep the markers on their own
+           lines; the build deletes the marker lines and everything
+           between them. -->
       <a href="selftest.html">Core self-test</a>
+      <!-- dev-only:end -->
     </nav>
     Runs entirely in your browser. Nothing you type is sent anywhere or
     stored. Your theme choice is saved on this device only.

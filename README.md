@@ -81,7 +81,7 @@ it sends nothing anywhere and stores nothing.
 | `web/index.html` | The page: markup, styling, and form wiring. |
 | `web/calc_core.js` | Port of `calc_core.py`. Same formulas, bounds, validation order, rejection codes, and copy. |
 | `web/fixture.js` | Generated expected-output data captured from the Python core. Do not edit by hand. |
-| `web/selftest.html` | Open it to check `calc_core.js` against `fixture.js`. |
+| `web/selftest.html` | Check `calc_core.js` against `fixture.js`. Published to the preview, stripped from production — see [Deploying](#deploying). |
 | `web/selftest.js` | The self-test's checks. Shared by that page and the CI runner, so both mean the same thing by "PASS". |
 | `web/manifest.json` | App metadata that makes the page installable. |
 | `web/sw.js` | Service worker: offline support for the installed app. |
@@ -129,9 +129,10 @@ stale version. Opening `index.html` from a `file://` path is
 unaffected: the service worker never registers there, and the page
 behaves exactly as before.
 
-The self-test is deliberately excluded from offline support — it is a
-development tool, and caching its 1.5 MB fixture would multiply the
-installed footprint roughly 30×.
+The self-test is deliberately excluded from offline support, and from
+the production build altogether — it is a development tool, and its
+1.5 MB fixture would multiply the installed footprint roughly 30×. It
+is published to the preview site, where the point is to exercise it.
 
 ### Verifying the port
 
@@ -173,18 +174,39 @@ port is correct.
 
 ### Deploying
 
-`.github/workflows/deploy.yml` publishes `web/` to GitHub Pages on every
-push to `main`. A visitor downloads about 50 KB — the page, the core,
-and the app manifest and icons. The 1.5 MB `fixture.js` is only fetched
-by someone who opens the self-test.
+`.github/workflows/deploy.yml` runs on every push to `main` **or**
+`development`, and publishes two things to the one GitHub Pages site:
+
+| URL | Built from | Contains |
+| --- | --- | --- |
+| `/Weight-Goal-Calculator/` | `main` | The product. Self-test stripped. |
+| `/Weight-Goal-Calculator/preview/` | `development` | Everything, self-test included. Not indexed. |
+
+Day-to-day work lands on `development` and is testable on real HTTPS at
+the preview URL — service worker, PWA install, the actual Pages
+environment — without touching what visitors see. `main` only moves when
+a merge is called for, and that is what changes production.
+
+Pages hosts a single site per repository and every deploy replaces it
+wholesale, so there is no way to publish a preview without also
+republishing the root. Each deploy therefore rebuilds both, taking the
+root from `main` and the preview from `development` regardless of which
+branch triggered it. A push to `development` republishes a root that is
+byte-identical to what is already live, since `main` hasn't moved.
+
+A production visitor downloads about 50 KB — the page, the core, and the
+app manifest and icons. The 1.5 MB `fixture.js` never reaches them.
 
 **One-time setup:** in the repository's *Settings → Pages*, set **Source**
 to **GitHub Actions**. Until that's done the deploy step fails with a
 "Pages is not enabled" error while the verification step still passes.
 
-The workflow refuses to deploy unless three things hold: the Python
-suite passes, `web/fixture.js` matches what `calc_core.py` currently
-produces, and `node tools/run_selftest.js` reports zero mismatches.
+The workflow refuses to deploy — either branch — unless three things
+hold: the Python suite passes, `web/fixture.js` matches what
+`calc_core.py` currently produces, and `node tools/run_selftest.js`
+reports zero mismatches. The gate runs against whichever branch was
+pushed, so work on `development` is verified before it can reach the
+preview, not first checked on the way into production.
 
 Those last two are the point of the pipeline, and they guard opposite
 directions of the same drift. The fixture check catches `calc_core.py`
