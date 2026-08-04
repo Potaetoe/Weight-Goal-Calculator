@@ -154,6 +154,13 @@ InstallUX.setup({
       "Scroll down the share sheet and tap “Add to Home Screen”.",
       "Tap “Add” in the top-right corner."
     ]],
+    ["ios-chrome", "iPhone or iPad (Chrome)", [
+      "Open this page in Chrome.",
+      "Tap the Share button — the square with an arrow pointing up, at the right end of the address bar.",
+      "Scroll down the share sheet and tap “Add to Home Screen”.",
+      "Tap “Add” in the top-right corner.",
+      "This needs iOS 16.4 or newer. On older versions, open the page in Safari instead — the steps above under “iPhone or iPad (Safari)” apply."
+    ]],
     ["safari-mac", "Safari on a Mac", [
       "Open this page in Safari.",
       "In the menu bar at the top of the screen, click “File”, then “Add to Dock…”.",
@@ -191,7 +198,8 @@ InstallUX.setup({
     var ua = navigator.userAgent;
     if (/iPad|iPhone|iPod/.test(ua) ||
         (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) {
-      return "ios";
+      // Chrome on iOS identifies as CriOS, not Chrome.
+      return /CriOS\//.test(ua) ? "ios-chrome" : "ios";
     }
     if (/Android/.test(ua)) return "android";
     if (/Firefox\//.test(ua)) return "firefox";

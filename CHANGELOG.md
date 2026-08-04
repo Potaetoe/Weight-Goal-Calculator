@@ -9,7 +9,8 @@ commit dates. The web version deploys to GitHub Pages on every push to
 ### Added
 - `web/install.html` now carries a "Step-by-step instructions"
   dropdown listing each platform — Chrome and Edge on a computer,
-  Android Chrome, iPhone/iPad Safari, Mac Safari, and Firefox — with
+  Android Chrome, iPhone/iPad Safari, iPhone/iPad Chrome (iOS 16.4+,
+  detected via its CriOS user agent), Mac Safari, and Firefox — with
   the exact, word-for-word taps and clicks for each, quoting the
   browser's own menu labels. The visitor's platform is preselected
   from the user agent; the dropdown covers everyone else. Firefox's
