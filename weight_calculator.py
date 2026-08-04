@@ -44,6 +44,18 @@ CHANGES FROM ORIGINAL  (each marked inline with a [Cn] tag)
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+from calc_core import (
+    ACTIVITY_LEVELS,
+    MAX_PACE_KG,
+    MAX_PACE_LB,
+    RawInputs,
+    calculate_plan,
+    cm_to_ft_in,
+    ft_in_to_cm,
+    kg_to_lb,
+    lb_to_kg,
+)
+
 # ---------------------------------------------------------------------------
 # Color palette - pastel, pink-primary
 # ---------------------------------------------------------------------------
@@ -61,41 +73,9 @@ FONT_HEADER = ("Verdana", 11, "bold")
 FONT_BODY = ("Verdana", 10)
 FONT_SMALL = ("Verdana", 8)
 
-ACTIVITY_LEVELS = {
-    "Sedentary (little/no exercise)": 1.2,
-    "Lightly active (1-3 days/week)": 1.375,
-    "Moderately active (3-5 days/week)": 1.55,
-    "Very active (6-7 days/week)": 1.725,
-    "Extremely active (physical job + training)": 1.9,
-}
-
-KG_PER_LB = 0.45359237
-CM_PER_IN = 2.54
-CAL_PER_KG_FAT = 7700  # commonly used approximation
-
-# --- Bounds ----------------------------------------------------------------
-MAX_PACE_LB = 100          # [C3] whole lb per week
-MAX_PACE_KG = 100          # [C3] whole kg per week
-CALORIE_FLOOR = 1200     # [C4] hard floor, not a warning threshold
-MIN_AGE = 18             # [C6]
-MAX_AGE = 1000            # [C6]
-MIN_GOAL_BMI = 18.5      # [C7] standard adult underweight threshold
-
-
-def lb_to_kg(lb):
-    return lb * KG_PER_LB
-
-
-def kg_to_lb(kg):
-    return kg / KG_PER_LB
-
-
-def in_to_cm(inches):
-    return inches * CM_PER_IN
-
-
-def cm_to_in(cm):
-    return cm / CM_PER_IN
+# Rejection codes the results card renders inline. Everything else is a
+# modal error dialog, matching the pre-refactor behavior.
+RESULTS_CARD_CODES = {"CALORIE_FLOOR"}
 
 
 class WeightCalculatorApp(tk.Tk):
@@ -251,11 +231,35 @@ class WeightCalculatorApp(tk.Tk):
         self.age_entry = ttk.Entry(form, width=12)
         self.age_entry.grid(row=1, column=1, sticky="w")
 
-        # Height
-        self.height_label = ttk.Label(form, text="Height (in):", style="Card.TLabel")
+        # Height. Two layouts share one grid cell: feet+inches for
+        # imperial, a single cm box for metric. _update_unit_labels swaps
+        # which one is mapped.
+        self.height_label = ttk.Label(form, text="Height:", style="Card.TLabel")
         self.height_label.grid(row=2, column=0, sticky="w", pady=6)
-        self.height_entry = ttk.Entry(form, width=12)
-        self.height_entry.grid(row=2, column=1, sticky="w")
+
+        self.height_imperial_frame = ttk.Frame(form, style="Card.TFrame")
+        self.height_imperial_frame.grid(row=2, column=1, sticky="w")
+        self.height_ft_entry = ttk.Entry(self.height_imperial_frame, width=4)
+        self.height_ft_entry.pack(side="left")
+        ttk.Label(
+            self.height_imperial_frame, text=" ft ", style="Card.TLabel"
+        ).pack(side="left")
+        self.height_in_entry = ttk.Entry(self.height_imperial_frame, width=4)
+        self.height_in_entry.pack(side="left")
+        ttk.Label(
+            self.height_imperial_frame, text=" in", style="Card.TLabel"
+        ).pack(side="left")
+
+        self.height_metric_frame = ttk.Frame(form, style="Card.TFrame")
+        self.height_metric_frame.grid(row=2, column=1, sticky="w")
+        self.height_cm_entry = ttk.Entry(self.height_metric_frame, width=8)
+        self.height_cm_entry.pack(side="left")
+        ttk.Label(
+            self.height_metric_frame, text=" cm", style="Card.TLabel"
+        ).pack(side="left")
+
+        # Imperial is the startup unit, so hide the metric pair.
+        self.height_metric_frame.grid_remove()
 
         # Current weight
         self.weight_label = ttk.Label(form, text="Current weight (lb):", style="Card.TLabel")
@@ -374,6 +378,36 @@ class WeightCalculatorApp(tk.Tk):
         entry.delete(0, tk.END)
         entry.insert(0, f"{fn(val):g}")
 
+    @staticmethod
+    def _set_entry(entry, text):
+        entry.delete(0, tk.END)
+        entry.insert(0, text)
+
+    def _height_to_metric(self):
+        """[C5] ft+in -> cm. Leaves cm blank if feet is blank/unparseable."""
+        try:
+            feet = float(self.height_ft_entry.get().strip())
+        except ValueError:
+            return
+        inches_raw = self.height_in_entry.get().strip()
+        try:
+            inches = float(inches_raw) if inches_raw else 0.0
+        except ValueError:
+            return
+        self._set_entry(
+            self.height_cm_entry, f"{round(ft_in_to_cm(feet, inches), 1):g}"
+        )
+
+    def _height_to_imperial(self):
+        """[C5] cm -> ft+in, with the 12-inch carry handled in the core."""
+        try:
+            cm = float(self.height_cm_entry.get().strip())
+        except ValueError:
+            return
+        feet, inches = cm_to_ft_in(cm)
+        self._set_entry(self.height_ft_entry, f"{feet:g}")
+        self._set_entry(self.height_in_entry, f"{inches:g}")
+
     def _update_unit_labels(self):
         new_unit = self.unit_var.get()
 
@@ -381,13 +415,17 @@ class WeightCalculatorApp(tk.Tk):
         # 165 lb as 165 kg. Rounded to one decimal for readability.
         if new_unit != self._prev_unit:
             if new_unit == "metric":
-                self._convert_entry(self.height_entry, lambda v: round(in_to_cm(v), 1))
+                self._height_to_metric()
                 self._convert_entry(self.weight_entry, lambda v: round(lb_to_kg(v), 1))
                 self._convert_entry(self.goal_entry, lambda v: round(lb_to_kg(v), 1))
+                self.height_imperial_frame.grid_remove()
+                self.height_metric_frame.grid()
             else:
-                self._convert_entry(self.height_entry, lambda v: round(cm_to_in(v), 1))
+                self._height_to_imperial()
                 self._convert_entry(self.weight_entry, lambda v: round(kg_to_lb(v), 1))
                 self._convert_entry(self.goal_entry, lambda v: round(kg_to_lb(v), 1))
+                self.height_metric_frame.grid_remove()
+                self.height_imperial_frame.grid()
             # Pace is a small integer with different ceilings per unit;
             # converting it produces confusing rounding, so reset to default.
             self.pace_entry.delete(0, tk.END)
@@ -395,13 +433,11 @@ class WeightCalculatorApp(tk.Tk):
             self._prev_unit = new_unit
 
         if new_unit == "imperial":
-            self.height_label.config(text="Height (in):")
             self.weight_label.config(text="Current weight (lb):")
             self.goal_label.config(text="Goal weight (lb):")
             self.pace_label.config(text="Target pace (lb/week):")
             self.pace_hint.config(text=f" whole number, 1-{MAX_PACE_LB}")
         else:
-            self.height_label.config(text="Height (cm):")
             self.weight_label.config(text="Current weight (kg):")
             self.goal_label.config(text="Goal weight (kg):")
             self.pace_label.config(text="Target pace (kg/week):")
@@ -414,195 +450,81 @@ class WeightCalculatorApp(tk.Tk):
     # Calculation
     # ------------------------------------------------------------------
     def _calculate(self):
-        try:
-            age = float(self.age_entry.get())
-            height_raw = float(self.height_entry.get())
-            weight_raw = float(self.weight_entry.get())
-            goal_raw = float(self.goal_entry.get())
-        except ValueError:
-            messagebox.showerror(
-                "Missing or invalid input",
-                "Please enter valid numbers for age, height, current weight, and goal weight.",
+        """Collect the form, hand it to the core, present what comes back.
+
+        All arithmetic and every accept/reject decision lives in
+        calc_core.calculate_plan. This method only moves values in and
+        renders values out.
+        """
+        outcome = calculate_plan(
+            RawInputs(
+                unit=self.unit_var.get(),
+                sex=self.sex_var.get(),
+                age=self.age_entry.get(),
+                height_cm=self.height_cm_entry.get(),
+                height_ft=self.height_ft_entry.get(),
+                height_in=self.height_in_entry.get(),
+                weight=self.weight_entry.get(),
+                goal=self.goal_entry.get(),
+                body_fat=self.bodyfat_entry.get(),
+                activity_key=self.activity_var.get(),
+                pace=self.pace_entry.get(),
             )
-            return
+        )
 
-        if age <= 0 or height_raw <= 0 or weight_raw <= 0 or goal_raw <= 0:
-            messagebox.showerror("Invalid input", "All values must be greater than zero.")
-            return
-
-        # [C6] Age bounds. Mifflin-St Jeor and the activity multipliers are
-        # adult figures; this tool has no valid output for children.
-        if age < MIN_AGE or age > MAX_AGE:
-            messagebox.showerror(
-                "Age out of range",
-                f"This calculator supports ages {MIN_AGE}-{MAX_AGE}.\n\n"
-                "The formulas it uses are validated for adults only. If you are "
-                "under 18, please speak with a doctor or a registered dietitian "
-                "rather than using a calculator.",
-            )
-            return
-
-        # Normalize to metric for the math
-        if self.unit_var.get() == "imperial":
-            height_cm = in_to_cm(height_raw)
-            weight_kg = lb_to_kg(weight_raw)
-            goal_kg = lb_to_kg(goal_raw)
-            unit_label = "lb"
-        else:
-            height_cm = height_raw
-            weight_kg = weight_raw
-            goal_kg = goal_raw
-            unit_label = "kg"
-
-        display_weight = weight_raw
-        display_goal = goal_raw
-
-        # [C7] Goal weight sanity check against a BMI floor. The original
-        # accepted any positive goal and produced a confident timeline.
-        height_m = height_cm / 100.0
-        goal_bmi = goal_kg / (height_m ** 2)
-        if goal_bmi < MIN_GOAL_BMI:
-            min_goal_kg = MIN_GOAL_BMI * (height_m ** 2)
-            min_goal_display = (
-                kg_to_lb(min_goal_kg) if unit_label == "lb" else min_goal_kg
-            )
-            messagebox.showerror(
-                "Goal weight out of range",
-                f"A goal of {display_goal:g} {unit_label} at your height falls below "
-                f"a BMI of {MIN_GOAL_BMI}, the standard adult underweight threshold.\n\n"
-                f"This calculator will not generate a plan below roughly "
-                f"{min_goal_display:.0f} {unit_label}.\n\n"
-                "If you believe a lower target is right for you, that is a "
-                "conversation for a physician or registered dietitian.",
-            )
-            return
-
-        # Optional body fat % -> Katch-McArdle if provided, else Mifflin-St Jeor
-        bodyfat_raw = self.bodyfat_entry.get().strip()
-        formula_used = "Mifflin-St Jeor"
-        if bodyfat_raw:
-            try:
-                bodyfat_pct = float(bodyfat_raw)
-            except ValueError:
-                messagebox.showerror("Invalid input", "Body fat % must be a number, or leave it blank.")
-                return
-            if not (0 < bodyfat_pct < 75):
-                messagebox.showerror("Invalid input", "Body fat % should be a realistic value between 0 and 75.")
-                return
-            lean_mass_kg = weight_kg * (1 - bodyfat_pct / 100)
-            bmr = 370 + (21.6 * lean_mass_kg)
-            formula_used = "Katch-McArdle"
-        else:
-            if self.sex_var.get() == "male":
-                bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) + 5
+        if not outcome.ok:
+            if outcome.code in RESULTS_CARD_CODES:
+                self.results_label.config(text=outcome.message)
             else:
-                bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) - 161
-
-        activity_factor = ACTIVITY_LEVELS[self.activity_var.get()]
-        tdee = bmr * activity_factor
-
-        # [C1][C2][C3] Weekly pace: user-entered whole number, interpreted in
-        # the active display unit, bounded.
-        pace_raw = self.pace_entry.get().strip()
-        try:
-            pace_val = int(pace_raw)
-        except ValueError:
-            messagebox.showerror("Invalid pace", "Target pace must be a whole number.")
+                messagebox.showerror(outcome.title, outcome.message)
             return
 
-        if pace_val <= 0:
-            messagebox.showerror("Invalid pace", "Target pace must be greater than zero.")
-            return
+        self.results_label.config(text="\n".join(self._format_plan(outcome)))
 
-        if self.unit_var.get() == "imperial":
-            if pace_val > MAX_PACE_LB:
-                messagebox.showerror(
-                    "Pace out of range",
-                    f"Maximum supported pace is {MAX_PACE_LB} lb per week.\n\n"
-                    "Faster rates fall outside the range this calculator's model "
-                    "is valid for and would produce unreliable results.",
-                )
-                return
-            kg_per_week = lb_to_kg(pace_val)
-        else:
-            if pace_val > MAX_PACE_KG:
-                messagebox.showerror(
-                    "Pace out of range",
-                    f"Maximum supported pace is {MAX_PACE_KG} kg per week.\n\n"
-                    "Faster rates fall outside the range this calculator's model "
-                    "is valid for and would produce unreliable results.",
-                )
-                return
-            kg_per_week = float(pace_val)
+    # ------------------------------------------------------------------
+    # Presentation
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _format_plan(plan):
+        """Turn a Plan into display lines. Pure formatting, no math."""
+        unit_label = plan.inputs.unit_label
 
-        daily_deficit_or_surplus = (kg_per_week * CAL_PER_KG_FAT) / 7
-
-        weight_diff_kg = goal_kg - weight_kg  # positive = gain, negative = loss
-
-        if abs(weight_diff_kg) < 0.01:
-            target_calories = tdee
-            direction = "maintain"
-            weeks_needed = 0
-        elif weight_diff_kg > 0:
-            direction = "gain"
-            target_calories = tdee + daily_deficit_or_surplus
-            weeks_needed = weight_diff_kg / kg_per_week
-        else:
-            direction = "lose"
-            target_calories = tdee - daily_deficit_or_surplus
-            weeks_needed = abs(weight_diff_kg) / kg_per_week
-
-        # [C4] Hard floor. The original computed this as a boolean and printed
-        # the out-of-range number anyway with a warning underneath it.
-        if direction != "maintain" and target_calories < CALORIE_FLOOR:
-            self.results_label.config(
-                text=(
-                    "No plan generated.\n\n"
-                    "The selected pace would require intake below "
-                    f"{CALORIE_FLOOR:,} kcal/day for your inputs, which is outside "
-                    "the range this tool will produce a plan for.\n\n"
-                    "Try a slower pace, or speak with a healthcare provider."
-                )
-            )
-            return
-
-        weeks_needed_display = round(weeks_needed, 1)
-        months_needed_display = round(weeks_needed / 4.345, 1) if weeks_needed else 0
-
-        result_lines = [
-            f"Formula used: {formula_used}",
-            f"BMR (calories your body burns at rest): {bmr:,.0f} kcal/day",
-            f"TDEE (calories burned with activity): {tdee:,.0f} kcal/day",
+        lines = [
+            f"Formula used: {plan.formula}",
+            f"BMR (calories your body burns at rest): {plan.bmr:,.0f} kcal/day",
+            f"TDEE (calories burned with activity): {plan.tdee:,.0f} kcal/day",
             "",
         ]
 
-        if direction == "maintain":
-            result_lines.append(
-                f"You're already at your goal weight. Eat around {tdee:,.0f} kcal/day to maintain."
+        if plan.direction == "maintain":
+            lines.append(
+                f"You're already at your goal weight. Eat around "
+                f"{plan.tdee:,.0f} kcal/day to maintain."
             )
-        else:
-            verb = "gain" if direction == "gain" else "lose"
-            result_lines.append(
-                f"To {verb} weight at {pace_val} {unit_label}/week, aim for about "
-                f"{target_calories:,.0f} kcal/day."
-            )
-            result_lines.append(
-                f"That's a daily {'surplus' if direction == 'gain' else 'deficit'} of "
-                f"~{daily_deficit_or_surplus:,.0f} kcal vs. your maintenance level."
-            )
-            result_lines.append("")
-            result_lines.append(
-                f"Estimated time to reach {display_goal:g} {unit_label} from "
-                f"{display_weight:g} {unit_label}: "
-                f"~{weeks_needed_display} weeks (~{months_needed_display} months)."
-            )
-            result_lines.append("")
-            result_lines.append(
-                "Note: this timeline assumes your maintenance level stays constant. "
-                "It falls as you lose weight, so real-world timelines run longer."
-            )
+            return lines
 
-        self.results_label.config(text="\n".join(result_lines))
+        verb = "gain" if plan.direction == "gain" else "lose"
+        noun = "surplus" if plan.direction == "gain" else "deficit"
+        lines.append(
+            f"To {verb} weight at {plan.inputs.pace} {unit_label}/week, aim for about "
+            f"{plan.target_calories:,.0f} kcal/day."
+        )
+        lines.append(
+            f"That's a daily {noun} of "
+            f"~{plan.daily_delta:,.0f} kcal vs. your maintenance level."
+        )
+        lines.append("")
+        lines.append(
+            f"Estimated time to reach {plan.inputs.goal:g} {unit_label} from "
+            f"{plan.inputs.weight:g} {unit_label}: "
+            f"~{round(plan.weeks, 1)} weeks (~{round(plan.months, 1)} months)."
+        )
+        lines.append("")
+        lines.append(
+            "Note: this timeline assumes your maintenance level stays constant. "
+            "It falls as you lose weight, so real-world timelines run longer."
+        )
+        return lines
 
 
 if __name__ == "__main__":
