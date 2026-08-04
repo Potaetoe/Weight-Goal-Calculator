@@ -1,8 +1,29 @@
 # Changelog
 
 Notable changes to the Weight Goal Calculator, newest first. Dates are
-commit dates. Every push to `main` publishes both the production site and
-the `/preview/` build, so web entries go live as soon as they land.
+commit dates. Every push to `main` publishes the site, so web entries go
+live as soon as they land.
+
+## 2026-08-04 — Dropped the /preview/ deployment
+
+### Removed
+- The `/preview/` build. Deploys are now root-only: one branch, one
+  build, `web/` minus the self-test.
+
+### Notes
+- Once the branch split was gone, preview and production shipped from
+  the same push — so the "look at it before it's live" value it was
+  originally justified by no longer existed.
+- What remained was narrower than it looked. Android install testing
+  works locally (Chrome DevTools USB port forwarding makes a forwarded
+  `localhost` a secure context), service workers and install prompts
+  fire on `localhost`, and every path in this app is relative so a
+  subpath proves nothing the root doesn't. The only genuine gap was
+  installing the PWA from a real iPhone, which isn't something this
+  project does.
+- `web/selftest.html` is unchanged and stays in the repository for local
+  use. The `<!-- dev-only -->` markers stay too — they are still what
+  keeps the footer link out of the deployed page.
 
 ## 2026-08-04 — Collapsed to one branch, two builds
 

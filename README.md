@@ -81,7 +81,7 @@ it sends nothing anywhere and stores nothing.
 | `web/index.html` | The page: markup, styling, and form wiring. |
 | `web/calc_core.js` | Port of `calc_core.py`. Same formulas, bounds, validation order, rejection codes, and copy. |
 | `web/fixture.js` | Generated expected-output data captured from the Python core. Do not edit by hand. |
-| `web/selftest.html` | Check `calc_core.js` against `fixture.js`. Published to the preview, stripped from production — see [Deploying](#deploying). |
+| `web/selftest.html` | Open it locally to check `calc_core.js` against `fixture.js`. Not deployed — see [Deploying](#deploying). |
 | `web/selftest.js` | The self-test's checks. Shared by that page and the CI runner, so both mean the same thing by "PASS". |
 | `web/manifest.json` | App metadata that makes the page installable. |
 | `web/sw.js` | Service worker: offline support for the installed app. |
@@ -130,9 +130,9 @@ unaffected: the service worker never registers there, and the page
 behaves exactly as before.
 
 The self-test is deliberately excluded from offline support, and from
-the production build altogether — it is a development tool, and its
-1.5 MB fixture would multiply the installed footprint roughly 30×. It
-is published to the preview site, where the point is to exercise it.
+the deployed site altogether — it is a development tool, and its 1.5 MB
+fixture would multiply the installed footprint roughly 30×. Run it from
+a local checkout.
 
 ### Verifying the port
 
@@ -175,31 +175,33 @@ port is correct.
 ### Deploying
 
 `.github/workflows/deploy.yml` runs on every push to `main` and publishes
-**two builds of that same commit** to the one GitHub Pages site:
+`web/` **minus the self-test** to GitHub Pages. The build removes
+`selftest.html`, `selftest.js`, `fixture.js`, and any `<!-- dev-only -->`
+blocks that link to them, then fails rather than deploy if any survived
+or if a published page still references one — so a live 404 can't slip
+through.
 
-| URL | Contains |
-| --- | --- |
-| `/Weight-Goal-Calculator/` | The product. Self-test stripped. |
-| `/Weight-Goal-Calculator/preview/` | The same source untouched, self-test included. Not indexed. |
+Those files stay in the repository. They run locally and in the verify
+job; they are simply not part of the product. A visitor downloads about
+50 KB — the page, the core, and the app manifest and icons. The 1.5 MB
+`fixture.js` never reaches them.
 
-There is deliberately no second branch. The two builds differ only at
-build time: the production build removes `selftest.html`, `selftest.js`,
-`fixture.js`, and any `<!-- dev-only -->` blocks that link to them.
+There is deliberately **no staging branch and no preview deployment.**
+Both were tried and removed. Every path in this app is relative, so it
+behaves identically at any prefix, and `http://localhost` is a secure
+context — the service worker registers and the install prompt fires
+there. Local verification covers everything except installing the PWA
+from a real iPhone.
 
-The preview covers the two things localhost can't: installing the PWA
-from a real phone — a LAN address over plain http isn't a secure context,
-so the install prompt won't fire — and handing someone a link before it
-is the live site. Everything else is testable locally; every path in this
-app is relative, so it behaves the same at any prefix.
+So **a push is a release.** Verify locally first:
 
-Note that on a single branch **a push is a release.** Verify locally
-first (`python -m http.server` in `web/`, which *is* a secure context and
-does exercise the service worker). If you ever need to stage unreleased
-work where someone else can see it, that is the point at which a second
-branch earns its keep — not before.
+```bash
+python -m http.server 8123 --directory web
+```
 
-A production visitor downloads about 50 KB — the page, the core, and the
-app manifest and icons. The 1.5 MB `fixture.js` never reaches them.
+What protects production is the verify job below, not a staging step.
+Bring one back only if work genuinely needs reviewing on a URL before it
+goes live — a second contributor, say.
 
 **One-time setup:** in the repository's *Settings → Pages*, set **Source**
 to **GitHub Actions**. Until that's done the deploy step fails with a

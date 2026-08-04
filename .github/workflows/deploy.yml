@@ -7,26 +7,23 @@ name: Verify and deploy
 # which is the one failure this pipeline exists to prevent.
 #
 # ---------------------------------------------------------------------
-# ONE BRANCH, TWO BUILDS
+# ONE BRANCH, ONE BUILD
 #
-# Every push publishes two builds of the same commit:
+# Every push to main publishes web/ minus the self-test: selftest.html,
+# selftest.js, fixture.js, and the <!-- dev-only --> blocks that link to
+# them. Those stay in the repository and run locally and in the verify
+# job below - they are just not part of the product.
 #
-#   /          the product, self-test stripped
-#   /preview/  the same source untouched, self-test included, noindex
+# There is deliberately no staging branch and no /preview/ deployment.
+# Both were tried and removed: every path in this app is relative, so it
+# behaves identically at any prefix, and http://localhost is a secure
+# context, so the service worker registers and the install prompt fires
+# there. Local verification covers everything except installing the PWA
+# from a real iPhone, which nobody here does.
 #
-# The preview exists for the things localhost cannot do: installing the
-# PWA from a real phone (a LAN address over plain http is not a secure
-# context) and handing someone a link before it is the live site.
-# Everything else about this app is testable locally - every path in it
-# is relative, so it behaves the same at any prefix.
-#
-# This deliberately does NOT use a second branch. The two builds differ
-# only at build time: the production build removes the self-test files
-# and the <!-- dev-only --> blocks that link to them. A branch split
-# bought nothing here except merge conflicts and the chance for a clean
-# auto-merge to quietly falsify a comment. If work ever needs staging
-# where someone else can see it before release, that is when to bring a
-# second branch back.
+# A push is therefore a release. What protects production is the verify
+# job, not a staging step. Bring one back only if work genuinely needs
+# to be reviewable on a URL before it goes live.
 # ---------------------------------------------------------------------
 
 on:
@@ -148,7 +145,7 @@ jobs:
 
       - uses: actions/configure-pages@v5
 
-      - name: Build the production root
+      - name: Build the site
         # The self-test is developer tooling, not part of the product.
         # fixture.js alone is 1.5 MB against roughly 50 KB for the whole
         # app, so publishing it would multiply the site's weight ~30x to
@@ -166,40 +163,18 @@ jobs:
           # fixture anyway or publishes a link that 404s.
           for f in selftest.html selftest.js fixture.js; do
             if [ -e "_site/$f" ]; then
-              echo "::error::$f is still in the production build"
+              echo "::error::$f is still in the build"
               exit 1
             fi
           done
           if grep -rn 'selftest\.html\|selftest\.js\|fixture\.js' \
                --include='*.html' --include='*.json' _site; then
-            echo "::error::a production page still references the" \
-                 "self-test, which is not published at the root"
+            echo "::error::a published page still references the" \
+                 "self-test, which is not deployed - that link would 404"
             exit 1
           fi
-          echo "production root ($(du -sh _site | cut -f1)):"
+          echo "publishing ($(du -sh _site | cut -f1)):"
           ls _site
-
-      - name: Build the preview
-        # The same commit, published intact - self-test and all. The
-        # point of the preview is to exercise on real HTTPS exactly what
-        # the production build strips.
-        run: |
-          cp -r web _site/preview
-          # Staging must not be indexed. <head> is its own line in every
-          # page here, which the verify job's asset check keeps true.
-          find _site/preview -name '*.html' -exec sed -i \
-            's|^<head>$|<head>\n<meta name="robots" content="noindex">|' {} +
-
-          # The preview is worthless if the harness didn't make it.
-          for f in selftest.html selftest.js fixture.js index.html; do
-            if [ ! -e "_site/preview/$f" ]; then
-              echo "::error::preview is missing $f"
-              exit 1
-            fi
-          done
-          grep -q 'name="robots" content="noindex"' _site/preview/index.html
-          echo "preview ($(du -sh _site/preview | cut -f1)):"
-          ls _site/preview
 
       - uses: actions/upload-pages-artifact@v3
         with:
