@@ -100,6 +100,21 @@ connection:
   Add to Home screen*.
 - **iOS / iPadOS:** in Safari, tap *Share → Add to Home Screen*.
 
+The page also shows its own **Install this app** button when the
+browser allows a one-tap install (or, elsewhere, per-platform
+instructions on click). To send someone straight to it, share the URL
+with `?install` appended:
+
+```
+https://potaetoe.github.io/Weight-Goal-Calculator/?install
+```
+
+That link opens the page with the install button revealed, scrolled
+into view, and focused. It is deliberately one tap away rather than
+zero: no URL can trigger installation directly — every browser
+requires a gesture on the page — so this is as close to an "install
+link" as the platform permits.
+
 The installed app updates itself the next time it is opened with a
 connection — the service worker always prefers the network and only
 falls back to its cached copy offline, so it can never pin you to a

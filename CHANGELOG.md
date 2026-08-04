@@ -4,6 +4,21 @@ Notable changes to the Weight Goal Calculator, newest first. Dates are
 commit dates. The web version deploys to GitHub Pages on every push to
 `main`, so entries there go live immediately.
 
+## 2026-08-04 — In-page install button and ?install share link
+
+### Added
+- An **Install this app** card on the web page. When the browser
+  offers one-tap install (Chromium's `beforeinstallprompt`), the
+  button opens the native install dialog; everywhere else it shows
+  per-platform instructions (iOS gets the Share → Add to Home Screen
+  steps directly). Hidden when already running as an installed app
+  and on `file://`, where installing isn't possible.
+- A shareable install link: appending `?install` to the page URL
+  reveals the card, scrolls it into view, and focuses the button — as
+  close to an "install link" as browsers permit, since installation
+  always requires a tap on the page.
+- README — documented the button and the `?install` link.
+
 ## 2026-08-04 — Installable app (PWA)
 
 ### Added
