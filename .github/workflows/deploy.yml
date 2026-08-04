@@ -1,14 +1,37 @@
 name: Verify and deploy
 
-# Publishes web/ to GitHub Pages, but only after the Python suite passes
-# and the generated fixture is confirmed current. A stale fixture would
-# let the deployed self-test report PASS while the two implementations
-# actually disagree, which is the one failure this pipeline exists to
-# prevent.
+# Publishes to GitHub Pages, but only after the Python suite passes, the
+# generated fixture is confirmed current, and the browser core's
+# self-test reports zero mismatches. A stale fixture would let the
+# self-test report PASS while the two implementations actually disagree,
+# which is the one failure this pipeline exists to prevent.
+#
+# ---------------------------------------------------------------------
+# TWO BRANCHES, ONE PAGES SITE
+#
+# Pages hosts a single site per repository and every deploy replaces it
+# wholesale - there is no way to publish a preview without also
+# republishing the root. So each deploy rebuilds both, from whichever
+# branch owns each:
+#
+#   /          production, built from main, self-test stripped
+#   /preview/  staging,    built from development, self-test included
+#
+# That means a push to development republishes the root from main's
+# current HEAD. The content is identical to what is already live (main
+# has not moved), so this is a no-op in practice - but it is why the
+# root is always taken from main and never from the pushed branch.
+#
+# The two builds differ only at build time. Both branches carry the same
+# source; the production build removes the self-test files and the
+# <!-- dev-only --> blocks that link to them. Nothing about the split
+# lives in the branch contents, so development and main never conflict
+# over these files.
+# ---------------------------------------------------------------------
 
 on:
   push:
-    branches: [main]
+    branches: [main, development]
   workflow_dispatch:
 
 permissions:
@@ -121,37 +144,74 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      # Both branches, regardless of which one triggered the run - the
+      # root always comes from main and the preview always from
+      # development. See the note at the top of this file.
+      - name: Check out main (production source)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-src
+
+      - name: Check out development (preview source)
+        uses: actions/checkout@v4
+        with:
+          ref: development
+          path: dev-src
 
       - uses: actions/configure-pages@v5
 
-      - name: Stage the site without the self-test
+      - name: Build the production root from main
         # The self-test is developer tooling, not part of the product.
-        # It stays in the repo - the verify job above runs it, and it is
-        # still openable locally - but it is not published: fixture.js
-        # alone is 1.5 MB against roughly 50 KB for the whole app, so
-        # shipping it would multiply the site's weight ~30x to serve a
-        # page no visitor has a reason to open.
+        # fixture.js alone is 1.5 MB against roughly 50 KB for the whole
+        # app, so publishing it would multiply the site's weight ~30x to
+        # serve a page no visitor has a reason to open.
         run: |
           rm -rf _site
-          cp -r web _site
+          cp -r main-src/web _site
           rm -f _site/selftest.html _site/selftest.js _site/fixture.js
-          # Fail rather than publish if any of them survived the copy,
-          # and catch a link in the shipped pages that would now 404.
+          # Drop the <!-- dev-only --> blocks, which link to the pages
+          # that were just removed.
+          find _site -name '*.html' -exec \
+            sed -i '/<!-- dev-only:start/,/<!-- dev-only:end -->/d' {} +
+
+          # Guards. A silent failure here either ships the 1.5 MB
+          # fixture anyway or publishes a link that 404s.
           for f in selftest.html selftest.js fixture.js; do
             if [ -e "_site/$f" ]; then
-              echo "::error::$f is still in the staged site"
+              echo "::error::$f is still in the production build"
               exit 1
             fi
           done
           if grep -rn 'selftest\.html\|selftest\.js\|fixture\.js' \
                --include='*.html' --include='*.json' _site; then
-            echo "::error::a published page still references the " \
-                 "self-test, which is not deployed - that link would 404"
+            echo "::error::a production page still references the" \
+                 "self-test, which is not published at the root"
             exit 1
           fi
-          echo "staged $(du -sh _site | cut -f1) to publish:"
+          echo "production root ($(du -sh _site | cut -f1)):"
           ls _site
+
+      - name: Build the preview from development
+        # Published intact, self-test and all - the point of the preview
+        # is to exercise on real HTTPS what the production build strips.
+        run: |
+          cp -r dev-src/web _site/preview
+          # Staging must not be indexed. <head> is its own line in every
+          # page here, which the verify job's asset check keeps true.
+          find _site/preview -name '*.html' -exec sed -i \
+            's|^<head>$|<head>\n<meta name="robots" content="noindex">|' {} +
+
+          # The preview is worthless if the harness didn't make it.
+          for f in selftest.html selftest.js fixture.js index.html; do
+            if [ ! -e "_site/preview/$f" ]; then
+              echo "::error::preview is missing $f"
+              exit 1
+            fi
+          done
+          grep -q 'name="robots" content="noindex"' _site/preview/index.html
+          echo "preview ($(du -sh _site/preview | cut -f1)):"
+          ls _site/preview
 
       - uses: actions/upload-pages-artifact@v3
         with:

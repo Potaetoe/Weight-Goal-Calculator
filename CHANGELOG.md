@@ -1,8 +1,43 @@
 # Changelog
 
 Notable changes to the Weight Goal Calculator, newest first. Dates are
-commit dates. The web version deploys to GitHub Pages on every push to
-`main`, so entries there go live immediately.
+commit dates. Pushes to `main` publish the production site and pushes to
+`development` publish the `/preview/` site, so web entries go live as
+soon as they land on their branch.
+
+## 2026-08-04 — Two-branch pipeline: production from main, preview from development
+
+### Added
+- The deploy workflow now runs on pushes to `development` as well as
+  `main`, and publishes both from the one Pages site: the root is built
+  from `main` with the self-test stripped, and `/preview/` is built from
+  `development` with everything intact. Work on `development` is now
+  testable on real HTTPS — service worker, PWA install, the genuine
+  Pages environment — without touching what visitors see.
+- The verification gate (Python suite, fixture freshness, headless
+  self-test) now runs on `development` pushes too. Before this, work on
+  that branch had no CI at all and was first checked on the way into
+  production.
+- `<meta name="robots" content="noindex">` is injected into every
+  preview page at build time. Staging shouldn't be indexed.
+
+### Changed
+- The difference between the two builds is now entirely build-time.
+  Both branches carry the same source; the production build removes the
+  self-test files and any `<!-- dev-only -->` blocks that link to them.
+  Nothing about the split lives in branch contents, so `development` and
+  `main` never conflict over these files and merges stay clean.
+- The calculator footer's "Core self-test" link is wrapped in those
+  markers rather than deleted: present on the preview, stripped from
+  production.
+
+### Notes
+- Pages serves one site per repository and each deploy replaces it
+  wholesale, so a preview cannot be published without also republishing
+  the root. Every deploy therefore rebuilds both, always taking the root
+  from `main` and the preview from `development` regardless of which
+  branch triggered it. A `development` push republishes a root identical
+  to what is already live.
 
 ## 2026-08-04 — The self-test is no longer published
 
@@ -20,8 +55,9 @@ commit dates. The web version deploys to GitHub Pages on every push to
 
 ### Removed
 - The calculator footer's "Core self-test" link, which pointed at a
-  page that is no longer deployed. Open `web/selftest.html` from a
-  local checkout instead.
+  page that is no longer deployed. (Reinstated behind `<!-- dev-only -->`
+  markers by the entry above, which publishes it to the preview and
+  strips it from production.)
 
 ## 2026-08-04 — CI now runs the browser self-test; a test that wasn't testing
 

@@ -11,10 +11,12 @@
  * Network-first costs one request per load and can never serve stale
  * code while online; the cache only answers when the network cannot.
  *
- * selftest.html, selftest.js and fixture.js are absent from the shell
- * because they are absent from the deployed site altogether - the
- * self-test is developer tooling and the deploy job strips it. Nothing
- * to cache, and the 1.5 MB fixture never reaches an installed copy.
+ * selftest.html, selftest.js and fixture.js are deliberately outside
+ * the shell. The production build strips them entirely, so there is
+ * nothing there to cache; the preview build ships them, and leaving
+ * them uncached keeps the 1.5 MB fixture out of an installed copy and
+ * means the self-test always runs against the network's current code
+ * rather than a cached copy of it.
  */
 
 var CACHE = "wgc-shell-v3";
