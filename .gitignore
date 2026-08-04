@@ -11,3 +11,6 @@ venv/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Transient self-test builds (see tools/, scratch verification runs)
+web/_run_*.html

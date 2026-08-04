@@ -57,11 +57,63 @@ ahead if you already know a step.
 | `calc_core.py` | All the math and every accept/reject decision. Imports no GUI code and does no I/O. |
 | `tests/` | Test suite (standard library `unittest`, no pytest needed). |
 | `Run Weight Calculator.bat` | Windows double-click launcher. |
+| `web/` | Browser version — see [The web version](#the-web-version). |
+| `tools/gen_web_fixture.py` | Regenerates the fixture the web version is checked against. |
 | `requirements.txt` | Intentionally empty — see below. |
 
 The split exists so the calculation logic can be tested on its own, and
 so it can be reimplemented for other front-ends without untangling it
 from tkinter first.
+
+---
+
+## The web version
+
+`web/index.html` is the same calculator in a browser. **Open it by
+double-clicking — there is no build step, no npm, and no server.** It
+works from a `file://` path or any static host, and like the desktop app
+it sends nothing anywhere and stores nothing.
+
+| File | What it is |
+| --- | --- |
+| `web/index.html` | The page: markup, styling, and form wiring. |
+| `web/calc_core.js` | Port of `calc_core.py`. Same formulas, bounds, validation order, rejection codes, and copy. |
+| `web/fixture.js` | Generated expected-output data captured from the Python core. Do not edit by hand. |
+| `web/selftest.html` | Open it to check `calc_core.js` against `fixture.js`. |
+
+### Verifying the port
+
+The web core is correct exactly insofar as it reproduces `fixture.js`.
+Open `web/selftest.html` in a browser; it should report **PASS** with
+zero mismatches across ~27,000 checks — every formula, every rejection
+message, every rendered results line, and the number-formatting helpers.
+
+If you change `calc_core.py`, regenerate the fixture and re-check:
+
+```bash
+python tools/gen_web_fixture.py
+```
+
+Then reopen `selftest.html`. A red FAIL with a list of mismatches means
+the two implementations have drifted apart.
+
+### Why the core is a separate file
+
+`calc_core.js` is loaded with a `<script src>` rather than pasted inline,
+so the app and the self-test run *the same code*. Inlining it would mean
+two copies, and a copy that quietly drifts is exactly what the self-test
+exists to catch.
+
+### Differences from the desktop app
+
+Behaviour is identical — same numbers, same refusals. Presentation
+differs where the desktop conventions don't suit a web page:
+
+- Errors appear **beside the field** that caused them instead of in a
+  modal dialog, and when several numeric fields are wrong at once the
+  page marks each one rather than showing a single combined message.
+- The results area announces itself to screen readers when it updates.
+- The page follows your system light/dark preference.
 
 ---
 

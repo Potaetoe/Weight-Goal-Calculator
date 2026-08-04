@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weight Goal Calculator - core self-test</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font: 14px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
+    margin: 0; padding: 24px; background: #fff0f5; color: #5b4254;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 20px; opacity: .75; }
+  #summary { padding: 14px 16px; border-radius: 8px; font-weight: 700;
+             margin-bottom: 18px; }
+  .pass { background: #d8f0e4; color: #1d5b3f; }
+  .fail { background: #fde2e2; color: #8a3b3b; }
+  table { border-collapse: collapse; width: 100%; max-width: 900px; }
+  th, td { text-align: left; padding: 5px 10px; border-bottom: 1px solid rgba(0,0,0,.1); }
+  th { font-weight: 700; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .ok { color: #1d5b3f; }
+  .bad { color: #8a3b3b; font-weight: 700; }
+  pre { background: rgba(0,0,0,.05); padding: 12px; border-radius: 6px;
+        overflow-x: auto; max-width: 900px; white-space: pre-wrap;
+        word-break: break-word; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #241b21; color: #f0dde7; }
+    .pass { background: #1d3b2d; color: #a9e6c6; }
+    .fail { background: #4a2626; color: #f3b0b0; }
+    pre, th, td { border-color: rgba(255,255,255,.12); }
+    pre { background: rgba(255,255,255,.06); }
+    .ok { color: #a9e6c6; } .bad { color: #f3b0b0; }
+  }
+</style>
+</head>
+<body>
+<h1>Core self-test</h1>
+<p class="sub">
+  Compares <code>calc_core.js</code> against <code>fixture.js</code>,
+  which was generated from <code>calc_core.py</code>. Any mismatch is
+  porting drift.
+</p>
+
+<div id="summary">running…</div>
+<div id="tables"></div>
+<div id="details"></div>
+
+<script>
+// Load the core and fixture with a cache-buster. Without this the
+// browser will happily serve a stale calc_core.js and report PASS
+// against code it never ran - which is worse than no test at all.
+// document.write keeps the two loads synchronous and ordered.
+(function () {
+  var t = Date.now();
+  document.write('<script src="calc_core.js?t=' + t + '"><\/script>');
+  document.write('<script src="fixture.js?t=' + t + '"><\/script>');
+})();
+</script>
+<script>
+(function () {
+  "use strict";
+  var C = window.WeightCalcCore;
+  var F = window.WEB_FIXTURE;
+  var groups = [];
+  var failures = [];
+
+  // Exact match including NaN === NaN and -0 vs 0.
+  function same(a, b) {
+    if (typeof a === "number" && typeof b === "number") {
+      if (Number.isNaN(a) && Number.isNaN(b)) return true;
+      return a === b;
+    }
+    return a === b;
+  }
+
+  function check(group, name, actual, expected, ctx) {
+    var g = groups[groups.length - 1];
+    g.total++;
+    if (same(actual, expected)) { g.pass++; return true; }
+    g.fail++;
+    if (failures.length < 25) {
+      failures.push({
+        group: group, name: name,
+        expected: expected, actual: actual, ctx: ctx
+      });
+    }
+    return false;
+  }
+
+  function startGroup(label) {
+    groups.push({ label: label, total: 0, pass: 0, fail: 0 });
+    return label;
+  }
+
+  // ---------------------------------------------------------------
+  // 1. Constants
+  // ---------------------------------------------------------------
+  var g = startGroup("constants");
+  Object.keys(F.constants).forEach(function (k) {
+    check(g, k, C[k], F.constants[k]);
+  });
+  Object.keys(F.activity_levels).forEach(function (k) {
+    check(g, "activity " + k, C.ACTIVITY_LEVELS[k], F.activity_levels[k]);
+  });
+
+  // ---------------------------------------------------------------
+  // 1b. Number helpers, tested directly.
+  // The plan grid does not reach these: no input in it produces an
+  // exact rounding tie, and every value it formats renders the same
+  // under Python and naive JS. Without this group, a port could drop
+  // round-half-to-even and :g entirely and still show PASS.
+  // ---------------------------------------------------------------
+  g = startGroup("number helpers (pyRound / fmtG / fmtFixed)");
+  F.helpers.py_round.forEach(function (c) {
+    check(g, "pyRound(" + c.x + ", " + c.n + ")",
+          C.pyRound(c.x, c.n), c.expected, c);
+  });
+  F.helpers.fmt_g.forEach(function (c) {
+    check(g, "fmtG(" + c.x + ")", C.fmtG(c.x), c.expected, c);
+  });
+  F.helpers.fmt_fixed.forEach(function (c) {
+    check(g, "fmtFixed(" + c.x + ", " + c.n + ")",
+          C.fmtFixed(c.x, c.n), c.expected, c);
+  });
+  F.helpers.fmt_thousands.forEach(function (c) {
+    check(g, "fmtThousands(" + c.x + ")",
+          C.fmtThousands(c.x), c.expected, c);
+  });
+
+  // ---------------------------------------------------------------
+  // 2. Height conversions
+  // ---------------------------------------------------------------
+  g = startGroup("ft_in_to_cm / normalize_ft_in");
+  F.conversions.ft_in_to_cm.forEach(function (c) {
+    var label = c.feet + "ft " + c.inches + "in";
+    check(g, label + " -> cm", C.ftInToCm(c.feet, c.inches), c.cm, c);
+    var n = C.normalizeFtIn(c.feet, c.inches);
+    check(g, label + " -> norm ft", n[0], c.normalized[0], c);
+    check(g, label + " -> norm in", n[1], c.normalized[1], c);
+  });
+
+  g = startGroup("cm_to_ft_in");
+  F.conversions.cm_to_ft_in.forEach(function (c) {
+    var r = C.cmToFtIn(c.cm);
+    check(g, c.cm + "cm -> ft", r[0], c.feet, c);
+    check(g, c.cm + "cm -> in", r[1], c.inches, c);
+  });
+
+  // ---------------------------------------------------------------
+  // 3. calculatePlan across the full fixture grid
+  // ---------------------------------------------------------------
+  var PLAN_FIELDS = ["formula", "bmr", "tdee", "direction",
+                     "target_calories", "daily_delta", "weeks", "months"];
+
+  g = startGroup("calculatePlan");
+  F.plans.forEach(function (c, idx) {
+    var got;
+    try {
+      got = C.calculatePlan(c.i);
+    } catch (err) {
+      check(g, "case " + idx + " threw", String(err), "(no throw)", c.i);
+      return;
+    }
+    var want = c.o;
+    if (!check(g, "case " + idx + " ok", got.ok, want.ok, c.i)) return;
+
+    if (want.ok) {
+      PLAN_FIELDS.forEach(function (f) {
+        check(g, "case " + idx + " " + f, got[f], want[f], c.i);
+      });
+      check(g, "case " + idx + " height_cm",
+            got.inputs.height_cm, want.height_cm, c.i);
+      check(g, "case " + idx + " unit_label",
+            got.inputs.unit_label, want.unit_label, c.i);
+      if (want.formatted) {
+        var lines = C.formatPlan(got);
+        check(g, "case " + idx + " formatted line count",
+              lines.length, want.formatted.length, c.i);
+        want.formatted.forEach(function (want_line, li) {
+          check(g, "case " + idx + " formatted[" + li + "]",
+                lines[li], want_line, c.i);
+        });
+      }
+    } else {
+      check(g, "case " + idx + " code", got.code, want.code, c.i);
+      check(g, "case " + idx + " field", got.field, want.field, c.i);
+      check(g, "case " + idx + " title", got.title, want.title, c.i);
+      check(g, "case " + idx + " message", got.message, want.message, c.i);
+      Object.keys(want.context).forEach(function (k) {
+        check(g, "case " + idx + " context." + k,
+              got.context[k], want.context[k], c.i);
+      });
+      check(g, "case " + idx + " context keys",
+            Object.keys(got.context).sort().join(","),
+            Object.keys(want.context).sort().join(","), c.i);
+    }
+  });
+
+  // ---------------------------------------------------------------
+  // 4. Never throws
+  // ---------------------------------------------------------------
+  g = startGroup("never throws");
+  var junk = ["", " ", "abc", "0", "-1", "1e400", "nan", "inf", "1_0",
+              "0x10", "1.5", "999999999", "١٢", "null", "undefined"];
+  var checked = 0;
+  junk.forEach(function (a) {
+    junk.forEach(function (b) {
+      ["imperial", "metric"].forEach(function (u) {
+        var threw = false;
+        try {
+          C.calculatePlan({
+            unit: u, sex: "female", age: a, height_cm: b, height_ft: b,
+            height_in: a, weight: b, goal: a, body_fat: b,
+            activity_key: C.ACTIVITY_ORDER[0], pace: a
+          });
+        } catch (err) { threw = String(err); }
+        checked++;
+        if (threw !== false) check(g, "threw on " + a + "/" + b, threw, false);
+      });
+    });
+  });
+  check(g, "sweep size", checked > 300, true);
+
+  // ---------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------
+  var total = 0, pass = 0, fail = 0;
+  groups.forEach(function (x) { total += x.total; pass += x.pass; fail += x.fail; });
+
+  var sum = document.getElementById("summary");
+  sum.className = fail === 0 ? "pass" : "fail";
+  sum.textContent = fail === 0
+    ? "PASS - " + total.toLocaleString() + " checks, 0 mismatches ("
+      + F.plans.length.toLocaleString() + " plan cases)"
+    : "FAIL - " + fail.toLocaleString() + " of " + total.toLocaleString()
+      + " checks mismatched";
+
+  var rows = groups.map(function (x) {
+    return "<tr><td>" + x.label + "</td><td class='n'>" +
+      x.total.toLocaleString() + "</td><td class='n " +
+      (x.fail ? "bad" : "ok") + "'>" + x.fail.toLocaleString() + "</td></tr>";
+  }).join("");
+  document.getElementById("tables").innerHTML =
+    "<table><tr><th>group</th><th class='n'>checks</th>" +
+    "<th class='n'>mismatches</th></tr>" + rows + "</table>";
+
+  if (failures.length) {
+    document.getElementById("details").innerHTML =
+      "<h1 style='margin-top:24px'>First " + failures.length +
+      " mismatches</h1><pre>" +
+      failures.map(function (f) {
+        return f.group + " :: " + f.name +
+          "\n  expected: " + JSON.stringify(f.expected) +
+          "\n  actual  : " + JSON.stringify(f.actual) +
+          (f.ctx ? "\n  input   : " + JSON.stringify(f.ctx) : "");
+      }).join("\n\n").replace(/[<>&]/g, function (ch) {
+        return { "<": "&lt;", ">": "&gt;", "&": "&amp;" }[ch];
+      }) + "</pre>";
+  }
+
+  window.__SELFTEST__ = {
+    total: total, pass: pass, fail: fail,
+    groups: groups, failures: failures
+  };
+})();
+</script>
+</body>
+</html>

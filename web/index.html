@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weight Goal Calculator</title>
+<meta name="description" content="Estimate your calorie needs and a realistic timeline toward a weight goal. Runs entirely in your browser.">
+<style>
+  :root {
+    --bg: #fff0f5;
+    --card: #ffffff;
+    --primary: #f4a6c6;
+    --primary-dark: #e87fa8;
+    --text: #5b4254;
+    --muted: #8a7280;
+    --line: #f0dbe5;
+    --warn-bg: #fde2e2;
+    --warn-text: #8a3b3b;
+    --field-bg: #ffffff;
+    --focus: #c2185b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #241b21;
+      --card: #322730;
+      --primary: #e87fa8;
+      --primary-dark: #f4a6c6;
+      --text: #f5e6ee;
+      --muted: #bfa8b6;
+      --line: #473942;
+      --warn-bg: #4a2626;
+      --warn-text: #f3b0b0;
+      --field-bg: #241b21;
+      --focus: #ffa8c8;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  /* .inline sets display:flex, which would otherwise beat the UA
+     stylesheet's [hidden] rule and leave the hidden height pair on
+     screen. */
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    padding: 24px 16px 56px;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.55 Verdana, Geneva, "DejaVu Sans", sans-serif;
+  }
+  main { max-width: 620px; margin: 0 auto; }
+
+  h1 {
+    font-size: 1.5rem; line-height: 1.25;
+    color: var(--primary-dark); margin: 0 0 6px;
+  }
+  .tagline { margin: 0 0 20px; color: var(--muted); }
+
+  .card {
+    background: var(--card); border-radius: 14px;
+    padding: 20px; margin-bottom: 18px;
+    box-shadow: 0 1px 3px rgba(91,66,84,.08);
+  }
+
+  fieldset { border: 0; margin: 0 0 18px; padding: 0; }
+  fieldset:last-of-type { margin-bottom: 0; }
+  legend, .label {
+    font-weight: 700; font-size: .9rem;
+    padding: 0; margin-bottom: 7px; display: block;
+  }
+  .hint { font-size: .78rem; color: var(--muted); font-weight: 400; }
+
+  .segmented { display: flex; gap: 8px; flex-wrap: wrap; }
+  .segmented label {
+    flex: 1 1 auto; min-width: 130px;
+    border: 2px solid var(--line); border-radius: 10px;
+    padding: 9px 12px; cursor: pointer; text-align: center;
+    font-size: .88rem; background: var(--field-bg);
+  }
+  .segmented input { position: absolute; opacity: 0; pointer-events: none; }
+  .segmented label:has(input:checked) {
+    border-color: var(--primary-dark);
+    background: var(--primary); color: #fff; font-weight: 700;
+  }
+  .segmented label:has(input:focus-visible) {
+    outline: 3px solid var(--focus); outline-offset: 2px;
+  }
+
+  .row { margin-bottom: 16px; }
+  .row:last-child { margin-bottom: 0; }
+
+  input[type="text"], input[type="number"], select {
+    font: inherit; font-size: .95rem;
+    padding: 9px 11px;
+    border: 2px solid var(--line); border-radius: 10px;
+    background: var(--field-bg); color: var(--text);
+    width: 100%; max-width: 100%;
+  }
+  input:focus-visible, select:focus-visible, button:focus-visible {
+    outline: 3px solid var(--focus); outline-offset: 2px;
+  }
+  .inline { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .inline > span { font-size: .88rem; color: var(--muted); }
+  /* Written as input.w-* so these beat the input[type="text"] rule
+     above, which also carries one class-level of specificity. */
+  input.w-sm { width: 92px; }
+  input.w-md { width: 152px; }
+
+  .err {
+    display: none; margin-top: 6px;
+    font-size: .82rem; color: var(--warn-text); font-weight: 700;
+  }
+  .row.invalid .err { display: block; }
+  .row.invalid input, .row.invalid select { border-color: var(--warn-text); }
+
+  button.calc {
+    width: 100%; font: inherit; font-weight: 700; font-size: 1rem;
+    background: var(--primary); color: #fff;
+    border: 0; border-radius: 12px; padding: 14px;
+    cursor: pointer; margin-bottom: 18px;
+  }
+  button.calc:hover { background: var(--primary-dark); }
+
+  #results { white-space: pre-wrap; margin: 0; font-size: .93rem; }
+  #results.placeholder { color: var(--muted); }
+  #results.blocked { color: var(--warn-text); font-weight: 700; }
+
+  .disclaimer {
+    background: var(--warn-bg); color: var(--warn-text);
+    border-radius: 12px; padding: 14px 16px;
+    font-size: .8rem; line-height: 1.5;
+  }
+  .disclaimer strong { display: block; margin-bottom: 4px; }
+  footer { margin-top: 18px; font-size: .78rem; color: var(--muted); }
+  footer a { color: inherit; }
+
+  @media (max-width: 420px) {
+    body { padding: 16px 12px 40px; }
+    .card { padding: 16px; }
+    .w-md { width: 110px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Weight Goal Calculator</h1>
+  <p class="tagline">Estimate your calorie needs and a realistic timeline.</p>
+
+  <div class="disclaimer" role="note">
+    <strong>⚠ For entertainment and general informational purposes only.</strong>
+    This is not medical advice and is not a substitute for guidance from a
+    registered dietitian, nutritionist, or physician. Always consult a
+    qualified healthcare professional before changing your diet or exercise
+    routine, especially if you have any underlying health conditions.
+  </div>
+
+  <form id="form" class="card" novalidate style="margin-top:18px">
+    <fieldset>
+      <legend>Units</legend>
+      <div class="segmented">
+        <label><input type="radio" name="unit" value="imperial" checked> Imperial (lb, ft/in)</label>
+        <label><input type="radio" name="unit" value="metric"> Metric (kg, cm)</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Sex <span class="hint">(for the BMR formula)</span></legend>
+      <div class="segmented">
+        <label><input type="radio" name="sex" value="female" checked> Female</label>
+        <label><input type="radio" name="sex" value="male"> Male</label>
+      </div>
+      <p class="hint" style="margin:7px 0 0">
+        Ignored if you enter a body fat % — Katch-McArdle doesn't use it.
+      </p>
+    </fieldset>
+
+    <div class="row" id="row-age">
+      <label class="label" for="age">Age (years)</label>
+      <input type="text" inputmode="numeric" id="age" class="w-md" autocomplete="off">
+      <p class="err" id="err-age"></p>
+    </div>
+
+    <div class="row" id="row-height">
+      <span class="label" id="height-label">Height</span>
+      <div class="inline" id="height-imperial" role="group" aria-labelledby="height-label">
+        <input type="text" inputmode="decimal" id="height_ft" class="w-sm"
+               aria-label="Height, feet" autocomplete="off"><span>ft</span>
+        <input type="text" inputmode="decimal" id="height_in" class="w-sm"
+               aria-label="Height, inches" autocomplete="off"><span>in</span>
+      </div>
+      <div class="inline" id="height-metric" hidden role="group" aria-labelledby="height-label">
+        <input type="text" inputmode="decimal" id="height_cm" class="w-md"
+               aria-label="Height, centimetres" autocomplete="off"><span>cm</span>
+      </div>
+      <p class="hint" id="height-hint" style="margin:6px 0 0">
+        Leave inches blank for a round number of feet.
+      </p>
+      <p class="err" id="err-height"></p>
+    </div>
+
+    <div class="row" id="row-weight">
+      <label class="label" for="weight">Current weight <span class="hint" id="weight-unit">(lb)</span></label>
+      <input type="text" inputmode="decimal" id="weight" class="w-md" autocomplete="off">
+      <p class="err" id="err-weight"></p>
+    </div>
+
+    <div class="row" id="row-goal">
+      <label class="label" for="goal">Goal weight <span class="hint" id="goal-unit">(lb)</span></label>
+      <input type="text" inputmode="decimal" id="goal" class="w-md" autocomplete="off">
+      <p class="err" id="err-goal"></p>
+    </div>
+
+    <div class="row" id="row-activity">
+      <label class="label" for="activity">Activity level</label>
+      <select id="activity"></select>
+      <p class="err" id="err-activity"></p>
+    </div>
+
+    <div class="row" id="row-body_fat">
+      <label class="label" for="body_fat">Body fat % <span class="hint">(optional)</span></label>
+      <input type="text" inputmode="decimal" id="body_fat" class="w-md" autocomplete="off">
+      <p class="hint" style="margin:6px 0 0">
+        If provided, uses Katch-McArdle instead of Mifflin-St Jeor.
+      </p>
+      <p class="err" id="err-body_fat"></p>
+    </div>
+
+    <div class="row" id="row-pace">
+      <label class="label" for="pace">Target pace <span class="hint" id="pace-unit">(lb/week)</span></label>
+      <div class="inline">
+        <input type="text" inputmode="numeric" id="pace" class="w-sm" value="1" autocomplete="off">
+        <span id="pace-hint">whole number</span>
+      </div>
+      <p class="err" id="err-pace"></p>
+    </div>
+  </form>
+
+  <button type="button" class="calc" id="calculate">Calculate</button>
+
+  <div class="card">
+    <p id="results" class="placeholder" role="status" aria-live="polite">Your results will appear here.</p>
+  </div>
+
+  <footer>
+    Runs entirely in your browser. Nothing you type is sent anywhere or
+    stored. <a href="selftest.html">Core self-test</a>.
+  </footer>
+</main>
+
+<script src="calc_core.js"></script>
+<script>
+(function () {
+  "use strict";
+  var C = window.WeightCalcCore;
+  var $ = function (id) { return document.getElementById(id); };
+
+  var prevUnit = "imperial";
+
+  // Rejection codes rendered in the results area rather than at a field,
+  // matching the desktop app's split.
+  var RESULTS_AREA_CODES = { CALORIE_FLOOR: true };
+
+  // rejection.field -> the .row that should light up.
+  var FIELD_ROWS = {
+    age: "row-age",
+    height_in: "row-height",
+    height_cm: "row-height",
+    height_ft: "row-height",
+    weight: "row-weight",
+    goal: "row-goal",
+    body_fat: "row-body_fat",
+    activity_key: "row-activity",
+    pace: "row-pace"
+  };
+  var FIELD_ERRS = {
+    "row-age": "err-age", "row-height": "err-height",
+    "row-weight": "err-weight", "row-goal": "err-goal",
+    "row-body_fat": "err-body_fat", "row-activity": "err-activity",
+    "row-pace": "err-pace"
+  };
+
+  // ---- activity dropdown -------------------------------------------
+  C.ACTIVITY_ORDER.forEach(function (key) {
+    var opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = key;
+    $("activity").appendChild(opt);
+  });
+
+  // ---- unit handling -----------------------------------------------
+  function currentUnit() {
+    return document.querySelector('input[name="unit"]:checked').value;
+  }
+
+  function setVal(el, v) { el.value = v; }
+
+  function convertEntry(el, fn) {
+    var raw = el.value.trim();
+    if (!raw) return;
+    var n;
+    try { n = C.pyFloat(raw); } catch (e) { return; }
+    if (!isFinite(n)) return;
+    setVal(el, String(C.pyRound(fn(n), 1)));
+  }
+
+  function heightToMetric() {
+    var ft;
+    try { ft = C.pyFloat($("height_ft").value.trim()); } catch (e) { return; }
+    var inRaw = $("height_in").value.trim();
+    var inches = 0;
+    if (inRaw) { try { inches = C.pyFloat(inRaw); } catch (e2) { return; } }
+    if (!isFinite(ft) || !isFinite(inches)) return;
+    setVal($("height_cm"), String(C.pyRound(C.ftInToCm(ft, inches), 1)));
+  }
+
+  function heightToImperial() {
+    var cm;
+    try { cm = C.pyFloat($("height_cm").value.trim()); } catch (e) { return; }
+    if (!isFinite(cm)) return;
+    var r = C.cmToFtIn(cm);
+    setVal($("height_ft"), String(r[0]));
+    setVal($("height_in"), String(r[1]));
+  }
+
+  function updateUnits() {
+    var unit = currentUnit();
+    var imperial = unit === "imperial";
+
+    if (unit !== prevUnit) {
+      // Convert what's already typed so a toggle can't silently
+      // reinterpret 165 lb as 165 kg.
+      if (imperial) {
+        heightToImperial();
+        convertEntry($("weight"), C.kgToLb);
+        convertEntry($("goal"), C.kgToLb);
+      } else {
+        heightToMetric();
+        convertEntry($("weight"), C.lbToKg);
+        convertEntry($("goal"), C.lbToKg);
+      }
+      // Pace ceilings differ per unit and converting a small integer
+      // reads as noise, so reset to the default.
+      $("pace").value = "1";
+      prevUnit = unit;
+    }
+
+    $("height-imperial").hidden = !imperial;
+    $("height-metric").hidden = imperial;
+    $("height-hint").textContent = imperial
+      ? "Leave inches blank for a round number of feet."
+      : "Centimetres.";
+    $("weight-unit").textContent = imperial ? "(lb)" : "(kg)";
+    $("goal-unit").textContent = imperial ? "(lb)" : "(kg)";
+    $("pace-unit").textContent = imperial ? "(lb/week)" : "(kg/week)";
+    $("pace-hint").textContent = "whole number, 1-" +
+      (imperial ? C.MAX_PACE_LB : C.MAX_PACE_KG);
+  }
+
+  Array.prototype.forEach.call(
+    document.querySelectorAll('input[name="unit"]'),
+    function (el) { el.addEventListener("change", updateUnits); }
+  );
+
+  // ---- error display ------------------------------------------------
+  function clearErrors() {
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".row.invalid"),
+      function (row) {
+        row.classList.remove("invalid");
+        var err = $(FIELD_ERRS[row.id]);
+        if (err) { err.textContent = ""; }
+        Array.prototype.forEach.call(
+          row.querySelectorAll("input, select"),
+          function (el) { el.removeAttribute("aria-invalid"); }
+        );
+      }
+    );
+  }
+
+  function markField(rowId, message) {
+    var row = $(rowId);
+    if (!row) return false;
+    row.classList.add("invalid");
+    var err = $(FIELD_ERRS[rowId]);
+    if (err) err.textContent = message;
+    var first = row.querySelector("input, select");
+    if (first) first.setAttribute("aria-invalid", "true");
+    return true;
+  }
+
+  /* The core reports INVALID_NUMBER / NON_POSITIVE against "age" because
+   * the desktop app showed one dialog covering all four numeric fields.
+   * On a form we can do better and point at the actual offenders, so
+   * this re-checks them locally. The core is untouched - this only
+   * decides where the message is drawn. */
+  function markOffendingNumericFields(code, message) {
+    var imperial = currentUnit() === "imperial";
+    var checks = [
+      ["row-age", $("age").value],
+      ["row-weight", $("weight").value],
+      ["row-goal", $("goal").value]
+    ];
+    checks.push(["row-height", imperial ? $("height_ft").value : $("height_cm").value]);
+
+    var marked = 0;
+    checks.forEach(function (pair) {
+      var bad = false;
+      try {
+        var n = C.pyFloat(pair[1]);
+        if (code === "NON_POSITIVE" && !(n > 0)) bad = true;
+      } catch (e) { bad = true; }
+      if (bad) {
+        markField(pair[0], code === "NON_POSITIVE"
+          ? "Must be greater than zero."
+          : "Enter a number.");
+        marked++;
+      }
+    });
+    if (!marked) markField("row-age", message);
+  }
+
+  // ---- calculate ----------------------------------------------------
+  function readForm() {
+    return {
+      unit: currentUnit(),
+      sex: document.querySelector('input[name="sex"]:checked').value,
+      age: $("age").value,
+      height_cm: $("height_cm").value,
+      height_ft: $("height_ft").value,
+      height_in: $("height_in").value,
+      weight: $("weight").value,
+      goal: $("goal").value,
+      body_fat: $("body_fat").value,
+      activity_key: $("activity").value,
+      pace: $("pace").value
+    };
+  }
+
+  function showResults(text, cls) {
+    var el = $("results");
+    el.textContent = text;
+    el.className = cls || "";
+  }
+
+  function calculate() {
+    clearErrors();
+    var outcome = C.calculatePlan(readForm());
+
+    if (!outcome.ok) {
+      if (RESULTS_AREA_CODES[outcome.code]) {
+        showResults(outcome.message, "blocked");
+        return;
+      }
+      showResults("No results yet — fix the highlighted field above.",
+                  "placeholder");
+      if (outcome.code === "INVALID_NUMBER" || outcome.code === "NON_POSITIVE") {
+        markOffendingNumericFields(outcome.code, outcome.message);
+      } else {
+        markField(FIELD_ROWS[outcome.field] || "row-age", outcome.message);
+      }
+      var firstBad = document.querySelector(".row.invalid input, .row.invalid select");
+      if (firstBad) firstBad.focus();
+      return;
+    }
+
+    showResults(C.formatPlan(outcome).join("\n"), "");
+  }
+
+  $("calculate").addEventListener("click", calculate);
+  $("form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    calculate();
+  });
+  $("form").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && e.target.tagName === "INPUT") {
+      e.preventDefault();
+      calculate();
+    }
+  });
+
+  updateUnits();
+})();
+</script>
+</body>
+</html>
