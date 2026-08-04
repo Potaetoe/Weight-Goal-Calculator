@@ -44,7 +44,7 @@ CHANGES FROM ORIGINAL  (each marked inline with a [Cn] tag)
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from calc_core import (
+from core.calc_core import (
     ACTIVITY_LEVELS,
     MAX_PACE_KG,
     MAX_PACE_LB,

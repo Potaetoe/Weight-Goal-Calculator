@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate the PWA icons for web/icons/, using only the standard library.
+Generate the PWA icons for apps/web/icons/, using only the standard library.
 
 The artwork - a man and a woman standing on a scale - comes from a
 vector illustration supplied by the project owner; its SVG path data
@@ -26,7 +26,7 @@ import struct
 import zlib
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_DIR = os.path.join(REPO, "web", "icons")
+OUT_DIR = os.path.join(REPO, "apps", "web", "icons")
 
 BG = (0xF4, 0xA6, 0xC6)     # brand pink
 WHITE = (0xFF, 0xFF, 0xFF)  # the two figures, and the scale's display

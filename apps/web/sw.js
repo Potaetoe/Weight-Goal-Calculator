@@ -5,26 +5,30 @@
  *
  * The strategy is network-first with cache fallback, NOT cache-first.
  * This project has already been bitten once by a cache serving stale
- * code (see the cache-buster in selftest.html); a cache-first shell
+ * code (see the cache-buster in dev/selftest.html); a cache-first shell
  * would recreate that bug one layer down, pinning installed users to
  * an old calculator until someone remembered to bump the cache name.
  * Network-first costs one request per load and can never serve stale
  * code while online; the cache only answers when the network cannot.
  *
- * selftest.html, selftest.js and fixture.js are absent from the shell
- * because the build strips them from the deployed site entirely - the
- * self-test is developer tooling that runs from a local checkout, so
- * there is nothing here to cache and the 1.5 MB fixture never reaches
- * an installed copy.
+ * The self-test and its 1.5 MB fixture are not here because they are not
+ * in this directory at all - they live in dev/, which is never
+ * published. Nothing to strip, and nothing to forget to strip.
+ *
+ * SHELL must list every file in this directory except sw.js itself.
+ * tools/check_web.py enforces that, because the failure mode of
+ * forgetting an entry is invisible online and only breaks the installed
+ * app offline.
  */
 
-var CACHE = "wgc-shell-v3";
+var CACHE = "wgc-shell-v4";
 var SHELL = [
   "./",
   "index.html",
   "calc_core.js",
   "install.html",
   "install.js",
+  "theme.css",
   "theme.js",
   "manifest.json",
   "icons/icon-192.png",
@@ -32,7 +36,7 @@ var SHELL = [
   "icons/apple-touch-icon.png"
 ];
 // Cache keys and membership checks use pathnames so that query strings
-// (selftest.html loads calc_core.js?t=...) neither miss nor pollute.
+// (dev/selftest.html loads calc_core.js?t=...) neither miss nor pollute.
 var SHELL_PATHS = SHELL.map(function (p) {
   return new URL(p, self.location.href).pathname;
 });

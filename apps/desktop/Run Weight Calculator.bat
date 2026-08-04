@@ -1,19 +1,22 @@
 @echo off
 rem Double-click launcher for the Weight Goal Calculator.
-rem No build step and no dependencies - it just runs the Python script
-rem sitting next to it. Requires Python 3.8+ with tkinter (see README).
+rem No build step and no dependencies - it just runs the Python app.
+rem Requires Python 3.8+ with tkinter (see README.dev.md).
+rem
+rem Runs from the repo root rather than from this folder, because the app
+rem imports core.calc_core and needs the root on sys.path.
 
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 
 where pythonw >nul 2>&1
 if %errorlevel%==0 (
-    start "" pythonw "weight_calculator.py"
+    start "" pythonw -m apps.desktop.weight_calculator
     goto :eof
 )
 
 where python >nul 2>&1
 if %errorlevel%==0 (
-    python "weight_calculator.py"
+    python -m apps.desktop.weight_calculator
     goto :eof
 )
 

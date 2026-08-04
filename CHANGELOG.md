@@ -4,6 +4,47 @@ Notable changes to the Weight Goal Calculator, newest first. Dates are
 commit dates. Every push to `main` publishes the site, so web entries go
 live as soon as they land.
 
+## 2026-08-04 — Restructured the repository
+
+### Changed
+- Layout is now `core/` (the math), `apps/web/` and `apps/desktop/` (the
+  two front-ends), and `dev/` (the self-test and its fixture). The
+  desktop app and the core used to sit at the root while the deployed
+  product lived in a subdirectory.
+- The deploy build is `cp -r apps/web _site`. The strip step, the
+  three-name removal list, the `<!-- dev-only -->` sed pass, and the two
+  guards that failed the build if a deletion had been forgotten are all
+  gone — `apps/web` is exactly what ships, so there is nothing to
+  remove.
+- The desktop app runs as `python -m apps.desktop.weight_calculator`
+  from the repo root; it imports `core.calc_core` and needs the root on
+  `sys.path`. `Run Weight Calculator.bat` handles that itself.
+- `web/fixture.js` → `dev/fixture.js`; `web/selftest.*` → `dev/`.
+
+### Added
+- `apps/web/theme.css`, holding the three palettes once. Both pages
+  carried a full copy with a "keep in sync" comment between them.
+- `tools/check_web.py`: confirms `sw.js`'s `SHELL` and the contents of
+  `apps/web` agree in both directions, and that every local `href`/`src`
+  resolves. Replaces twelve hand-listed `test -f` lines in the workflow
+  that only knew about files somebody remembered to add.
+- `tools/check.py`: runs all four gates locally in one command.
+
+### Removed
+- The footer link to the self-test. It pointed at a page that now lives
+  outside the published directory, so it could only ever 404 in
+  production — and keeping it would have meant keeping the strip step
+  that this restructure exists to delete.
+
+### Notes
+- `apps/web/calc_core.js` stays with the web app rather than moving to
+  `core/` alongside `calc_core.py`. It has to be served from the site
+  root, so moving it out would force the build to copy it back in — the
+  exact file list being removed here.
+- No behaviour changed. The fixture is byte-identical after
+  regeneration, all 104 Python tests pass, and the browser self-test
+  reports 27,402 checks with zero mismatches.
+
 ## 2026-08-04 — Dropped the /preview/ deployment
 
 ### Removed

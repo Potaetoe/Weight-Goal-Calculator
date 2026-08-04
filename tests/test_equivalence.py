@@ -41,8 +41,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASELINE_COMMIT = "38817cea5817d4e6a381b81f2cb458e5a7755f4b"
 
 try:
-    import weight_calculator as new_wc
-    import calc_core
+    from apps.desktop import weight_calculator as new_wc
+    from core import calc_core
     HAVE_TK = True
 except Exception:  # pragma: no cover - environment dependent
     HAVE_TK = False

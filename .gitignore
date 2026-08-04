@@ -13,4 +13,7 @@ venv/
 Thumbs.db
 
 # Transient self-test builds (see tools/, scratch verification runs)
-web/_run_*.html
+dev/_run_*.html
+
+# Local build output from tools/check.py --build
+_site/

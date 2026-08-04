@@ -1,0 +1,86 @@
+/*
+ * The three palettes, in one place.
+ * ---------------------------------
+ * Every page in this directory links this file instead of declaring its
+ * own tokens. Both pages used to carry a full copy of all three palettes
+ * with a "keep in sync" comment between them, which is the same class of
+ * drift the core's self-test exists to catch - just without a test to
+ * catch it. One file, one definition, nothing to keep in sync.
+ *
+ * How a palette is chosen (theme.js writes the attribute):
+ *   no data-theme  -> Pink, unless the system prefers light, then Light
+ *   data-theme=... -> that palette, in both directions
+ *
+ * install.html uses a subset of these tokens; the unused ones cost
+ * nothing and keep the two pages describing the same palette.
+ *
+ * The <meta name="theme-color"> tags in each page repeat --bg for the
+ * light and dark cases. CSS cannot reach them, so those two values are
+ * the one duplication left; change a background here and check them.
+ */
+
+/* "Pink", the default: deep plum with pink accents. */
+:root {
+  --bg: #241b21;
+  --card: #322730;
+  --primary: #e87fa8;
+  --primary-dark: #f4a6c6;
+  --text: #f5e6ee;
+  --muted: #bfa8b6;
+  --line: #473942;
+  --warn-bg: #4a2626;
+  --warn-text: #f3b0b0;
+  --field-bg: #241b21;
+  --focus: #ffa8c8;
+}
+
+/* With no saved choice, a light-preferring system gets Light. Once a
+   theme is picked, the data-theme attribute wins in both directions.
+   Same values as [data-theme="light"] below. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg: #f2efe9;
+    --card: #faf8f4;
+    --primary: #5f7d59;
+    --primary-dark: #47613f;
+    --text: #3a3d35;
+    --muted: #77796d;
+    --line: #ddd8cb;
+    --warn-bg: #ece0d3;
+    --warn-text: #7a4a33;
+    --field-bg: #ffffff;
+    --focus: #3e5a38;
+  }
+}
+
+/* "Dark": a standard neutral web dark - near-black surfaces, gray text,
+   blue accent. */
+:root[data-theme="dark"] {
+  --bg: #121212;
+  --card: #1e1e1e;
+  --primary: #3b82f6;
+  --primary-dark: #60a5fa;
+  --text: #e4e4e7;
+  --muted: #a1a1aa;
+  --line: #33333a;
+  --warn-bg: #3a2222;
+  --warn-text: #f2b8b5;
+  --field-bg: #121212;
+  --focus: #93c5fd;
+}
+
+/* "Light" is deliberately natural rather than bright: linen and stone
+   neutrals with a muted sage accent. */
+:root[data-theme="light"] {
+  --bg: #f2efe9;
+  --card: #faf8f4;
+  --primary: #5f7d59;
+  --primary-dark: #47613f;
+  --text: #3a3d35;
+  --muted: #77796d;
+  --line: #ddd8cb;
+  --warn-bg: #ece0d3;
+  --warn-text: #7a4a33;
+  --field-bg: #ffffff;
+  --focus: #3e5a38;
+}

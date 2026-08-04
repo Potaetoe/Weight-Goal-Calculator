@@ -7,23 +7,28 @@ name: Verify and deploy
 # which is the one failure this pipeline exists to prevent.
 #
 # ---------------------------------------------------------------------
-# ONE BRANCH, ONE BUILD
+# THE BUILD IS A COPY
 #
-# Every push to main publishes web/ minus the self-test: selftest.html,
-# selftest.js, fixture.js, and the <!-- dev-only --> blocks that link to
-# them. Those stay in the repository and run locally and in the verify
-# job below - they are just not part of the product.
+# apps/web contains exactly what gets published - nothing more. The
+# self-test, its 1.5 MB fixture, and the checks all live in dev/, which
+# is a sibling directory the deploy never looks at.
 #
-# There is deliberately no staging branch and no /preview/ deployment.
+# This used to be a strip step: publish web/ minus three files by name,
+# minus any <!-- dev-only --> blocks, followed by guards that failed the
+# build if a stripped file survived or a published page still linked to
+# one. All of that was machinery for keeping product and tooling apart
+# inside one directory. Two directories do it for free, and a deletion
+# that never happens cannot go wrong.
+#
+# There is deliberately no staging branch and no preview deployment.
 # Both were tried and removed: every path in this app is relative, so it
 # behaves identically at any prefix, and http://localhost is a secure
 # context, so the service worker registers and the install prompt fires
 # there. Local verification covers everything except installing the PWA
-# from a real iPhone, which nobody here does.
+# from a real iPhone.
 #
 # A push is therefore a release. What protects production is the verify
-# job, not a staging step. Bring one back only if work genuinely needs
-# to be reviewable on a URL before it goes live.
+# job, not a staging step. Run tools/check.py before pushing.
 # ---------------------------------------------------------------------
 
 on:
@@ -58,10 +63,11 @@ jobs:
           python-version: '3.12'
 
       - name: Install tkinter
-        # weight_calculator.py imports tkinter at module scope. Importing it
-        # headless is fine - only instantiating Tk() needs a display - but
-        # without the package tests/test_formatting.py silently skips and
-        # the fixture loses its formatted-output section.
+        # apps/desktop/weight_calculator.py imports tkinter at module
+        # scope. Importing it headless is fine - only instantiating Tk()
+        # needs a display - but without the package
+        # tests/test_formatting.py silently skips and the fixture loses
+        # its formatted-output section.
         run: sudo apt-get update && sudo apt-get install -y python3-tk
 
       - name: Confirm tkinter is importable
@@ -70,9 +76,9 @@ jobs:
       - name: Run the Python suite
         run: python -m unittest discover -s tests -t . -v
 
-      - name: Check web/fixture.js is current
+      - name: Check dev/fixture.js is current
         run: |
-          cp web/fixture.js /tmp/fixture.committed.js
+          cp dev/fixture.js /tmp/fixture.committed.js
           python tools/gen_web_fixture.py
           python - <<'PY'
           import json
@@ -87,17 +93,17 @@ jobs:
           # Compared as re-serialized text rather than with ==, because the
           # fixture contains NaN and NaN != NaN would fail every run.
           committed = json.dumps(load("/tmp/fixture.committed.js"), sort_keys=True)
-          regenerated = json.dumps(load("web/fixture.js"), sort_keys=True)
+          regenerated = json.dumps(load("dev/fixture.js"), sort_keys=True)
 
           if committed != regenerated:
-              print("::error file=web/fixture.js::web/fixture.js is out of date. "
-                    "calc_core.py changed without the fixture being regenerated, "
-                    "so the deployed self-test would be checking web/calc_core.js "
-                    "against stale expectations. Run: python tools/gen_web_fixture.py "
-                    "and commit the result.")
+              print("::error file=dev/fixture.js::dev/fixture.js is out of date. "
+                    "core/calc_core.py changed without the fixture being "
+                    "regenerated, so the self-test would be checking "
+                    "apps/web/calc_core.js against stale expectations. Run: "
+                    "python tools/gen_web_fixture.py and commit the result.")
               sys.exit(1)
 
-          print("fixture matches the current calc_core.py")
+          print("fixture matches the current core/calc_core.py")
           PY
 
       - uses: actions/setup-node@v4
@@ -114,25 +120,11 @@ jobs:
         # tools/run_selftest.js.
         run: node tools/run_selftest.js
 
-      - name: Check the page's assets exist
-        # Cheap guard against a rename breaking the deployed page: the
-        # browser would just 404 the script and render a dead form.
-        run: |
-          test -f web/index.html
-          test -f web/calc_core.js
-          test -f web/selftest.html
-          test -f web/selftest.js
-          test -f web/manifest.json
-          test -f web/sw.js
-          test -f web/install.html
-          test -f web/install.js
-          test -f web/theme.js
-          test -f web/icons/icon-192.png
-          test -f web/icons/icon-512.png
-          test -f web/icons/apple-touch-icon.png
-          grep -q 'src="calc_core.js"' web/index.html
-          grep -q 'rel="manifest"' web/index.html
-          echo "web/ looks deployable"
+      - name: Check apps/web is publishable
+        # Derived from the directory rather than a list somebody has to
+        # remember to update: every file is in the service worker's
+        # shell, and every local href/src resolves. See tools/check_web.py.
+        run: python tools/check_web.py
 
   deploy:
     needs: verify
@@ -146,35 +138,13 @@ jobs:
       - uses: actions/configure-pages@v5
 
       - name: Build the site
-        # The self-test is developer tooling, not part of the product.
-        # fixture.js alone is 1.5 MB against roughly 50 KB for the whole
-        # app, so publishing it would multiply the site's weight ~30x to
-        # serve a page no visitor has a reason to open.
+        # A copy. apps/web is the product, so there is nothing to strip
+        # and nothing to guard against having failed to strip.
         run: |
           rm -rf _site
-          cp -r web _site
-          rm -f _site/selftest.html _site/selftest.js _site/fixture.js
-          # Drop the <!-- dev-only --> blocks, which link to the pages
-          # that were just removed.
-          find _site -name '*.html' -exec \
-            sed -i '/<!-- dev-only:start/,/<!-- dev-only:end -->/d' {} +
-
-          # Guards. A silent failure here either ships the 1.5 MB
-          # fixture anyway or publishes a link that 404s.
-          for f in selftest.html selftest.js fixture.js; do
-            if [ -e "_site/$f" ]; then
-              echo "::error::$f is still in the build"
-              exit 1
-            fi
-          done
-          if grep -rn 'selftest\.html\|selftest\.js\|fixture\.js' \
-               --include='*.html' --include='*.json' _site; then
-            echo "::error::a published page still references the" \
-                 "self-test, which is not deployed - that link would 404"
-            exit 1
-          fi
+          cp -r apps/web _site
           echo "publishing ($(du -sh _site | cut -f1)):"
-          ls _site
+          ls -R _site
 
       - uses: actions/upload-pages-artifact@v3
         with:

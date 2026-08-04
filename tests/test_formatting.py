@@ -17,11 +17,11 @@ import inspect
 import re
 import unittest
 
-import calc_core as core
-from calc_core import RawInputs, calculate_plan
+import core.calc_core as core
+from core.calc_core import RawInputs, calculate_plan
 
 try:
-    import weight_calculator as wc
+    from apps.desktop import weight_calculator as wc
     HAVE_TK = True
 except Exception:  # pragma: no cover - environment dependent
     HAVE_TK = False

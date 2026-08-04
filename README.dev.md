@@ -51,44 +51,76 @@ ahead if you already know a step.
 
 ## Project layout
 
-| File | What it is |
+```
+core/calc_core.py            the math and every accept/reject decision
+apps/web/                    the browser app — published verbatim
+apps/desktop/                the tkinter app
+dev/                         the self-test and its fixture — never published
+tools/                       generators and checks
+tests/                       standard-library unittest, no pytest needed
+```
+
+| Path | What it is |
 | --- | --- |
-| `weight_calculator.py` | The tkinter GUI. Collects the form, displays results. Contains no arithmetic. |
-| `calc_core.py` | All the math and every accept/reject decision. Imports no GUI code and does no I/O. |
-| `tests/` | Test suite (standard library `unittest`, no pytest needed). |
-| `Run Weight Calculator.bat` | Windows double-click launcher. |
-| `web/` | Browser version — see [The web version](#the-web-version). |
+| `core/calc_core.py` | All the math and every accept/reject decision. Imports no UI code and does no I/O. |
+| `apps/web/` | Browser version — see [The web version](#the-web-version). |
+| `apps/desktop/weight_calculator.py` | The tkinter GUI. Collects the form, displays results. Contains no arithmetic. |
+| `apps/desktop/Run Weight Calculator.bat` | Windows double-click launcher. |
+| `dev/selftest.html` | Open it locally to check `calc_core.js` against `fixture.js`. |
+| `dev/selftest.js` | The self-test's checks. Shared by that page and the CI runner, so both mean the same thing by "PASS". |
+| `dev/fixture.js` | Generated expected-output data captured from the Python core. Do not edit by hand. |
+| `tools/check.py` | Runs everything CI runs. **The one command to run before pushing.** |
+| `tools/check_web.py` | Confirms `apps/web` is publishable: shell complete, references resolve. |
 | `tools/gen_web_fixture.py` | Regenerates the fixture the web version is checked against. |
-| `tools/gen_icons.py` | Regenerates the app icons in `web/icons/`. |
+| `tools/gen_icons.py` | Regenerates the app icons in `apps/web/icons/`. |
+| `tools/run_selftest.js` | Runs the self-test headlessly, so CI can gate the deploy on it. |
 | `requirements.txt` | Intentionally empty — see below. |
 | `CHANGELOG.md` | Notable changes, newest first. |
 
-The split exists so the calculation logic can be tested on its own, and
-so it can be reimplemented for other front-ends without untangling it
-from tkinter first.
+Two boundaries are doing the work here.
+
+**Core versus UI** exists so the calculation logic can be tested on its
+own, and reimplemented for other front-ends without untangling it from
+tkinter first.
+
+**`apps/web` versus `dev`** exists so the deploy is a copy. Everything in
+`apps/web` is published; nothing in `dev` ever is. That used to be a
+filename convention inside a single directory, enforced by a strip step,
+a list of names in three places, and guards that failed the build if a
+deletion had been forgotten. A directory boundary does the same job for
+free — a deletion that never happens cannot go wrong.
+
+The one thing that surprises people: **`calc_core.js` lives in `apps/web`,
+not in `core/`,** even though `calc_core.py` is in `core/`. It has to be
+served from the site root, and putting it anywhere else would force the
+build to copy it in — which is exactly the file list this layout removes.
 
 ---
 
 ## The web version
 
-`web/index.html` is the same calculator in a browser. **Open it by
+`apps/web/index.html` is the same calculator in a browser. **Open it by
 double-clicking — there is no build step, no npm, and no server.** It
 works from a `file://` path or any static host, and like the desktop app
 it sends nothing anywhere and stores nothing.
 
+Every file below is published exactly as it sits. Nothing else is.
+
 | File | What it is |
 | --- | --- |
-| `web/index.html` | The page: markup, styling, and form wiring. |
-| `web/calc_core.js` | Port of `calc_core.py`. Same formulas, bounds, validation order, rejection codes, and copy. |
-| `web/fixture.js` | Generated expected-output data captured from the Python core. Do not edit by hand. |
-| `web/selftest.html` | Open it locally to check `calc_core.js` against `fixture.js`. Not deployed — see [Deploying](#deploying). |
-| `web/selftest.js` | The self-test's checks. Shared by that page and the CI runner, so both mean the same thing by "PASS". |
-| `web/manifest.json` | App metadata that makes the page installable. |
-| `web/sw.js` | Service worker: offline support for the installed app. |
-| `web/install.html` | Dedicated install page — the link to send people. |
-| `web/install.js` | Install-button logic shared by `index.html` and `install.html`. |
-| `web/theme.js` | Theme-picker logic shared by both pages. |
-| `web/icons/` | Generated app icons — regenerate with `tools/gen_icons.py`. |
+| `apps/web/index.html` | The page: markup, layout styling, and form wiring. |
+| `apps/web/calc_core.js` | Port of `core/calc_core.py`. Same formulas, bounds, validation order, rejection codes, and copy. |
+| `apps/web/theme.css` | The three palettes, shared by both pages. |
+| `apps/web/theme.js` | Theme-picker logic shared by both pages. |
+| `apps/web/install.html` | Dedicated install page — the link to send people. |
+| `apps/web/install.js` | Install-button logic shared by `index.html` and `install.html`. |
+| `apps/web/manifest.json` | App metadata that makes the page installable. |
+| `apps/web/sw.js` | Service worker: offline support for the installed app. |
+| `apps/web/icons/` | Generated app icons — regenerate with `tools/gen_icons.py`. |
+
+Adding a file here means adding it to `SHELL` in `sw.js`, or the
+installed app silently loses it offline. `tools/check_web.py` fails the
+build if you forget, in either direction.
 
 ### Installing it as an app
 
@@ -120,7 +152,9 @@ an "install link" as the platform permits.
 
 The calculator page links to the install page from its footer, and
 appending `?install` to the calculator's URL redirects there (so
-older shared links keep working).
+older shared links keep working). The footer does *not* link to the
+self-test: that page lives in `dev/`, outside the published directory,
+so a link to it could only ever 404 in production.
 
 The installed app updates itself the next time it is opened with a
 connection — the service worker always prefers the network and only
@@ -129,15 +163,28 @@ stale version. Opening `index.html` from a `file://` path is
 unaffected: the service worker never registers there, and the page
 behaves exactly as before.
 
-The self-test is deliberately excluded from offline support, and from
-the deployed site altogether — it is a development tool, and its 1.5 MB
-fixture would multiply the installed footprint roughly 30×. Run it from
-a local checkout.
+The self-test is not part of offline support or the deployed site — it
+is a development tool, and its 1.5 MB fixture would multiply the
+installed footprint roughly 30×. It lives in `dev/` and runs from a
+local checkout.
+
+### Before you push
+
+A push to `main` is a release. One command runs everything CI gates on:
+
+```bash
+python tools/check.py
+```
+
+It runs the Python suite, confirms `dev/fixture.js` still matches
+`core/calc_core.py`, runs the browser core's self-test, and confirms
+`apps/web` is publishable — then prints a pass/fail table. Anything
+other than all-green means don't push.
 
 ### Verifying the port
 
 The web core is correct exactly insofar as it reproduces `fixture.js`.
-Open `web/selftest.html` in a browser; it should report **PASS** with
+Open `dev/selftest.html` in a browser; it should report **PASS** with
 zero mismatches across ~27,000 checks — every formula, every rejection
 message, every rendered results line, and the number-formatting helpers.
 
@@ -149,16 +196,17 @@ node tools/run_selftest.js
 
 It prints the same per-group table and exits non-zero on any mismatch.
 Node is needed only for that runner — the app itself still has no build
-step and no dependencies.
+step and no dependencies, and `dev/selftest.html` covers the same ground
+if you don't have node installed.
 
-If you change `calc_core.py`, regenerate the fixture and re-check:
+If you change `core/calc_core.py`, regenerate the fixture and re-check:
 
 ```bash
 python tools/gen_web_fixture.py
 ```
 
-Then reopen `selftest.html`. A red FAIL with a list of mismatches means
-the two implementations have drifted apart.
+Then reopen `dev/selftest.html`. A red FAIL with a list of mismatches
+means the two implementations have drifted apart.
 
 ### Why the core is a separate file
 
@@ -167,24 +215,33 @@ so the app and the self-test run *the same code*. Inlining it would mean
 two copies, and a copy that quietly drifts is exactly what the self-test
 exists to catch.
 
-`web/selftest.js` is split out for the same reason one level up: the page
+`dev/selftest.js` is split out for the same reason one level up: the page
 you open and the runner CI blocks the deploy on share one definition of
 what the checks are, instead of two that can disagree about whether the
 port is correct.
 
+`theme.css` is the same idea applied to the palettes. Both pages used to
+declare all three themes inline with a "keep in sync" comment between
+them — the same drift risk the self-test exists to catch, minus the test.
+One file now, linked by both.
+
 ### Deploying
 
 `.github/workflows/deploy.yml` runs on every push to `main` and publishes
-`web/` **minus the self-test** to GitHub Pages. The build removes
-`selftest.html`, `selftest.js`, `fixture.js`, and any `<!-- dev-only -->`
-blocks that link to them, then fails rather than deploy if any survived
-or if a published page still references one — so a live 404 can't slip
-through.
+`apps/web/` to GitHub Pages. The build is one line:
 
-Those files stay in the repository. They run locally and in the verify
-job; they are simply not part of the product. A visitor downloads about
-50 KB — the page, the core, and the app manifest and icons. The 1.5 MB
-`fixture.js` never reaches them.
+```bash
+cp -r apps/web _site
+```
+
+No strip step, no list of files to remove, no guards checking that the
+removal worked. That machinery existed to keep the product and the
+developer tooling apart inside a single directory; two directories do it
+for free.
+
+The published directory is about 72 KB across 11 files — the two pages,
+the core, the stylesheet, the manifest, and the icons. The 1.5 MB
+`dev/fixture.js` is not in it and never was a candidate for deletion.
 
 There is deliberately **no staging branch and no preview deployment.**
 Both were tried and removed. Every path in this app is relative, so it
@@ -193,11 +250,16 @@ context — the service worker registers and the install prompt fires
 there. Local verification covers everything except installing the PWA
 from a real iPhone.
 
-So **a push is a release.** Verify locally first:
+So **a push is a release.** Run `python tools/check.py` first, and to
+look at the pages:
 
 ```bash
-python -m http.server 8123 --directory web
+python -m http.server 8123 --directory apps/web
 ```
+
+To open the self-test as well, serve the repo root instead
+(`python -m http.server 8123`) and visit `/dev/selftest.html` — or just
+open that file directly, which works over `file://`.
 
 What protects production is the verify job below, not a staging step.
 Bring one back only if work genuinely needs reviewing on a URL before it
@@ -207,21 +269,28 @@ goes live — a second contributor, say.
 to **GitHub Actions**. Until that's done the deploy step fails with a
 "Pages is not enabled" error while the verification step still passes.
 
-The workflow refuses to deploy unless three things hold: the Python suite
-passes, `web/fixture.js` matches what `calc_core.py` currently produces,
-and `node tools/run_selftest.js` reports zero mismatches. This gate — not
+The workflow refuses to deploy unless four things hold: the Python suite
+passes, `dev/fixture.js` matches what `core/calc_core.py` currently
+produces, `node tools/run_selftest.js` reports zero mismatches, and
+`tools/check_web.py` confirms `apps/web` is publishable. This gate — not
 a branch split — is what actually protects production.
 
-Those last two are the point of the pipeline, and they guard opposite
+The middle two are the point of the pipeline, and they guard opposite
 directions of the same drift. The fixture check catches `calc_core.py`
 moving away from `fixture.js` — a stale fixture would leave the
-published self-test comparing `calc_core.js` against outdated
-expectations, showing a confident green PASS while the two
-implementations had actually drifted apart. The self-test run catches
-`calc_core.js` moving away from `fixture.js`, which is what decides
-whether the page people actually load computes the right answers.
-Without it the pipeline would publish the JavaScript without ever
-executing a line of it.
+self-test comparing `calc_core.js` against outdated expectations,
+showing a confident green PASS while the two implementations had
+actually drifted apart. The self-test run catches `calc_core.js` moving
+away from `fixture.js`, which is what decides whether the page people
+actually load computes the right answers. Without it the pipeline would
+publish the JavaScript without ever executing a line of it.
+
+`tools/check_web.py` guards a quieter failure. It derives the app's file
+list from the directory rather than trusting a list someone maintains by
+hand, and fails if `sw.js`'s `SHELL` and the directory disagree in either
+direction, or if any local `href`/`src` in the HTML doesn't resolve. A
+file missing from `SHELL` breaks only the *installed* app, only
+*offline* — which is precisely the bug nobody notices before shipping.
 
 It also clones with full history, because `tests/test_equivalence.py`
 skips rather than fails when the commit it replays isn't reachable — a
@@ -366,17 +435,24 @@ and so the project plays nicely with standard tooling.
 
 ### Step 7 — Run the app
 
+**From the repo root**, not from inside `apps/desktop`:
+
 ```bash
-python3 weight_calculator.py
+python3 -m apps.desktop.weight_calculator
 ```
 
-(On Windows, if `python3` doesn't work, use `python weight_calculator.py`
-instead.)
+(On Windows, if `python3` doesn't work, use `python -m
+apps.desktop.weight_calculator` instead.)
+
+It runs as a module because it imports `core.calc_core`, which needs the
+repo root on `sys.path`. Running the file by path — `python
+apps/desktop/weight_calculator.py` — puts `apps/desktop` on the path
+instead and fails with `ModuleNotFoundError: No module named 'core'`.
 
 **On Windows you can also just double-click `Run Weight Calculator.bat`**
-in the project folder. It finds Python for you and opens the app with no
-console window behind it. If Python isn't installed, it says so instead
-of flashing and vanishing.
+in `apps/desktop/`. It changes to the repo root for you, finds Python,
+and opens the app with no console window behind it. If Python isn't
+installed, it says so instead of flashing and vanishing.
 
 A pastel pink window titled "Weight Goal Calculator" should open.
 
@@ -385,11 +461,14 @@ A pastel pink window titled "Weight Goal Calculator" should open.
 ## Running the tests
 
 The test suite uses only the standard library, so if you can run the
-app, you can run the tests. From the project folder:
+app, you can run the tests. From the repo root:
 
 ```bash
 python3 -m unittest discover -s tests -t .
 ```
+
+Or run the whole gate — tests, fixture freshness, the browser core's
+self-test, and the publishability check — with `python tools/check.py`.
 
 You should see a row of dots and `OK` at the end. For a list of every
 test name as it runs, add `-v`.
@@ -486,12 +565,10 @@ week — a far larger daily deficit than 1 lb per week. Try a pace of `1`
 in Imperial, or accept that a 1 kg/week target is aggressive enough that
 many people's numbers fall below the 1,200 kcal floor.
 
-**I get a "Permission denied" error on macOS/Linux**
-Try running with `python3 weight_calculator.py` rather than
-`./weight_calculator.py`, or make the file executable first:
-```bash
-chmod +x weight_calculator.py
-```
+**`ModuleNotFoundError: No module named 'core'`**
+You ran the app by path instead of as a module, or from somewhere other
+than the repo root. Use `python3 -m apps.desktop.weight_calculator` from
+the top of the checkout.
 
 ---
 

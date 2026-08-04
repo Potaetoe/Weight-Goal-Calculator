@@ -55,7 +55,9 @@
 // at all. document.write keeps the three loads synchronous and ordered.
 (function () {
   var t = Date.now();
-  document.write('<script src="calc_core.js?t=' + t + '"><\/script>');
+  // The core is loaded from apps/web - the same file the deployed page
+  // loads. Pointing at a copy here would defeat the whole exercise.
+  document.write('<script src="../apps/web/calc_core.js?t=' + t + '"><\/script>');
   document.write('<script src="fixture.js?t=' + t + '"><\/script>');
   document.write('<script src="selftest.js?t=' + t + '"><\/script>');
 })();

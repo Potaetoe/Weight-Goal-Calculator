@@ -8,7 +8,8 @@
  * rejection; it never throws and never displays anything.
  *
  * Correctness is defined as "reproduces web/fixture.js", which is
- * generated from the Python implementation. Open selftest.html to check.
+ * generated from the Python implementation. Open dev/selftest.html to
+ * check.
  *
  * DISCLAIMER: For entertainment and general informational purposes only.
  * Not medical advice. See README.md.

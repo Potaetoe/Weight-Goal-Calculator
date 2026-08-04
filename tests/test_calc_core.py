@@ -20,8 +20,8 @@ Stdlib only - no pytest, matching the project's zero-dependency stance.
 import itertools
 import unittest
 
-import calc_core as core
-from calc_core import Plan, RawInputs, Rejection, calculate_plan
+import core.calc_core as core
+from core.calc_core import Plan, RawInputs, Rejection, calculate_plan
 
 ACT = list(core.ACTIVITY_LEVELS)
 SEDENTARY = ACT[0]        # 1.2

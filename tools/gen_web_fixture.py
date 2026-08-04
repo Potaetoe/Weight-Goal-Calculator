@@ -2,14 +2,14 @@
 """
 Generate the cross-check fixture for the web port.
 
-Runs calc_core.py over a wide input grid and records what it returned, as
-a JavaScript file the self-test page can load over file:// without
-tripping CORS (a .json would need fetch()).
+Runs core/calc_core.py over a wide input grid and records what it
+returned, as a JavaScript file the self-test page can load over file://
+without tripping CORS (a .json would need fetch()).
 
 The web core is correct exactly insofar as it reproduces this file. Any
 divergence is porting drift.
 
-Regenerate after any change to calc_core.py:
+Regenerate after any change to core/calc_core.py:
     python tools/gen_web_fixture.py
 """
 
@@ -20,19 +20,19 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import calc_core as core
-from calc_core import RawInputs, calculate_plan
+import core.calc_core as core
+from core.calc_core import RawInputs, calculate_plan
 
 # _format_plan is a staticmethod with no widget access, so importing the
 # GUI module here costs nothing but the tkinter import.
 try:
-    from weight_calculator import WeightCalculatorApp
+    from apps.desktop.weight_calculator import WeightCalculatorApp
     FORMAT_PLAN = WeightCalculatorApp._format_plan
 except Exception:  # pragma: no cover - tkinter missing
     FORMAT_PLAN = None
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(REPO, "web", "fixture.js")
+OUT = os.path.join(REPO, "dev", "fixture.js")
 
 ACT = list(core.ACTIVITY_LEVELS)
 
