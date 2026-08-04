@@ -20,6 +20,10 @@ commit dates. The web version deploys to GitHub Pages on every push to
 - The install page's footer "Open the calculator" link — redundant
   with the "Use it in your browser" link in the card above it.
 
+### Added
+- Both footers now note the site was co-developed with Claude,
+  Anthropic's AI.
+
 ## 2026-08-04 — New app icon
 
 ### Changed
