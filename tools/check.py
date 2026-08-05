@@ -33,6 +33,38 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def find_node():
+    """Locate node, falling back to where the installers put it.
+
+    shutil.which alone is not enough: the Windows node installer adds
+    itself to the *machine* PATH, which a shell started from an already
+    running process does not see until it is restarted. So a machine
+    with node properly installed reports "node is not on PATH", the
+    self-test is skipped, and this whole gate says "Not safe to push"
+    for a reason that has nothing to do with the code being pushed. A
+    check that cries wolf gets ignored, which costs more than the check
+    was worth.
+    """
+    found = shutil.which("node")
+    if found:
+        return found
+
+    candidates = [
+        os.path.join(os.environ.get("ProgramFiles", ""), "nodejs", "node.exe"),
+        os.path.join(os.environ.get("ProgramFiles(x86)", ""), "nodejs",
+                     "node.exe"),
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "nodejs",
+                     "node.exe"),
+        "/usr/local/bin/node",
+        "/usr/bin/node",
+        os.path.expanduser("~/.nvm/current/bin/node"),
+    ]
+    for path in candidates:
+        if path and os.path.isfile(path):
+            return path
+    return None
+
+
 def run(label, argv):
     print("\n=== %s ===" % label, flush=True)
     result = subprocess.run(argv, cwd=REPO)
@@ -84,14 +116,15 @@ def main():
 
     results.append(("fixture freshness", fixture_is_current()))
 
-    node = shutil.which("node")
+    node = find_node()
     if node:
         results.append(("browser core self-test", run(
             "browser core self-test", [node, "tools/run_selftest.js"]
         )))
     else:
         print("\n=== browser core self-test ===")
-        print("SKIPPED - node is not on PATH. This is the only step that "
+        print("SKIPPED - node was not found, on PATH or in the usual install "
+              "locations. This is the only step that "
               "executes the JavaScript being deployed, so the run below is "
               "reported as failed rather than passing on three checks out "
               "of four.\n"
